@@ -1,0 +1,29 @@
+# --- Root ---
+.vscode/
+.idea/
+.DS_Store
+*.log
+npm-debug.log*
+
+# --- Frontend ---
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# --- Backend ---
+backend/node_modules/
+backend/.env
+backend/.env.local
+backend/database.sqlite
+backend/database.sqlite-journal
+
+# --- General Exclusions ---
+**/node_modules/
+**/.env
+**/.env.*
+!**/.env.example
