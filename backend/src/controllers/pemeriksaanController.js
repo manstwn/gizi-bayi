@@ -1,7 +1,6 @@
 const Pemeriksaan = require('../models/Pemeriksaan');
 const Balita = require('../models/Balita');
-const Setting = require('../models/Setting');
-const FuzzyService = require('../services/fuzzyService');
+const NutritionalStatusService = require('../services/nutritionalStatusService');
 
 exports.createPemeriksaan = async (req, res) => {
   try {
@@ -11,12 +10,12 @@ exports.createPemeriksaan = async (req, res) => {
     const balita = await Balita.findByPk(balita_id);
     if (!balita) return res.status(404).json({ message: 'Balita not found' });
 
-    // Fetch Fuzzy Settings from DB
-    const setting = await Setting.findOne({ where: { key: 'fuzzy_parameters' } });
-    const customParams = setting ? setting.value : null;
-
-    // Calculate Fuzzy Status
-    const fuzzyResult = FuzzyService.calculate(berat_badan, tinggi_badan, umur_bulan, customParams);
+    // Calculate Assessment using new Z-Score logic
+    const assessment = NutritionalStatusService.assess(
+      parseFloat(berat_badan), 
+      parseFloat(tinggi_badan), 
+      parseFloat(umur_bulan)
+    );
 
     const pemeriksaan = await Pemeriksaan.create({
       balita_id,
@@ -24,8 +23,8 @@ exports.createPemeriksaan = async (req, res) => {
       tinggi_badan,
       umur_bulan,
       tanggal_pemeriksaan: tanggal_pemeriksaan || new Date(),
-      hasil_fuzzy: fuzzyResult.value,
-      kategori_gizi: fuzzyResult.category,
+      hasil_fuzzy: assessment.indices.bbtb.z, // Storing primary Z-score
+      kategori_gizi: assessment.summary.status,
       petugas_id: req.user.id,
       catatan
     });
@@ -33,7 +32,7 @@ exports.createPemeriksaan = async (req, res) => {
     res.status(201).json({
       message: 'Pemeriksaan saved successfully',
       data: pemeriksaan,
-      fuzzy_details: fuzzyResult.details
+      assessment: assessment
     });
   } catch (error) {
     res.status(400).json({ message: 'Error creating pemeriksaan', error: error.message });
