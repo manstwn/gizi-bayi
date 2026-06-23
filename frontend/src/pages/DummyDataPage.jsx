@@ -9,21 +9,19 @@ import {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const CLASSES = [
-  { key: 'Gizi Buruk (Severely Wasted)', color: 'bg-rose-100 text-rose-700', bar: 'bg-rose-500' },
-  { key: 'Gizi Kurang (Wasted)', color: 'bg-amber-100 text-amber-700', bar: 'bg-amber-500' },
-  { key: 'Gizi Baik (Normal)', color: 'bg-emerald-100 text-emerald-700', bar: 'bg-emerald-500' },
-  { key: 'Berisiko Gizi Lebih', color: 'bg-orange-100 text-orange-700', bar: 'bg-orange-500' },
-  { key: 'Gizi Lebih (Overweight)', color: 'bg-yellow-100 text-yellow-700', bar: 'bg-yellow-500' },
-  { key: 'Obesitas', color: 'bg-purple-100 text-purple-700', bar: 'bg-purple-500' },
+  { key: 'Gizi Buruk',  color: 'bg-rose-100 text-rose-700',    bar: 'bg-rose-500'    },
+  { key: 'Gizi Kurang', color: 'bg-amber-100 text-amber-700',   bar: 'bg-amber-500'   },
+  { key: 'Gizi Baik',   color: 'bg-emerald-100 text-emerald-700', bar: 'bg-emerald-500' },
+  { key: 'Gizi Lebih',  color: 'bg-orange-100 text-orange-700', bar: 'bg-orange-500'  },
 ];
 
 const classStyle = (cls) => CLASSES.find(c => c.key === cls) || { color: 'bg-slate-100 text-slate-600', bar: 'bg-slate-400' };
 
 // Template JSON untuk import
 const IMPORT_TEMPLATE = `[
-  {"umur_bulan": 12, "berat_badan": 7.5, "tinggi_badan": 71.5, "kategori_gizi": "Gizi Kurang (Wasted)"},
-  {"umur_bulan": 24, "berat_badan": 11.0, "tinggi_badan": 85.0, "kategori_gizi": "Gizi Baik (Normal)"},
-  {"umur_bulan": 6, "berat_badan": 4.5, "tinggi_badan": 62.0, "kategori_gizi": "Gizi Buruk (Severely Wasted)"}
+  {"umur_bulan": 12, "berat_badan": 7.5,  "tinggi_badan": 71.5, "kategori_gizi": "Gizi Kurang"},
+  {"umur_bulan": 24, "berat_badan": 11.0, "tinggi_badan": 85.0, "kategori_gizi": "Gizi Baik"},
+  {"umur_bulan": 6,  "berat_badan": 4.5,  "tinggi_badan": 62.0, "kategori_gizi": "Gizi Buruk"}
 ]`;
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -50,12 +48,10 @@ const DummyDataPage = () => {
   const [genCount, setGenCount] = useState(50);
   const [useCustomDist, setUseCustomDist] = useState(false);
   const [customDist, setCustomDist] = useState({
-    'Gizi Buruk (Severely Wasted)': 10,
-    'Gizi Kurang (Wasted)': 20,
-    'Gizi Baik (Normal)': 40,
-    'Berisiko Gizi Lebih': 10,
-    'Gizi Lebih (Overweight)': 10,
-    'Obesitas': 10,
+    'Gizi Buruk':  25,
+    'Gizi Kurang': 25,
+    'Gizi Baik':   25,
+    'Gizi Lebih':  25,
   });
   const [batchLabel, setBatchLabel] = useState('');
 
@@ -223,7 +219,7 @@ const DummyDataPage = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {CLASSES.map(cls => {
           const count = data.classCounts?.[cls.key] ?? 0;
           const pct = data.total > 0 ? ((count / data.total) * 100).toFixed(0) : 0;

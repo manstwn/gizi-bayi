@@ -3,17 +3,16 @@ import api from '../services/api';
 import {
   Brain, PlayCircle, Database, RefreshCw, Trash2, CheckCircle2,
   ChevronDown, ChevronUp, AlertTriangle, TrendingUp, Table2, Info,
-  FlaskConical, Layers
+  FlaskConical, Layers, BarChart3, Target, Sigma
 } from 'lucide-react';
 
-// ─── Colour helpers ─────────────────────────────────────────────────────────
+// ─── Colour helpers ──────────────────────────────────────────────────────────
 const classColor = (cls) => {
   if (!cls) return 'bg-slate-100 text-slate-600';
   const l = cls.toLowerCase();
   if (l.includes('buruk')) return 'bg-rose-100 text-rose-700';
-  if (l.includes('kurang') || l.includes('wasted')) return 'bg-amber-100 text-amber-700';
-  if (l.includes('obesitas')) return 'bg-purple-100 text-purple-700';
-  if (l.includes('lebih') || l.includes('overweight') || l.includes('berisiko')) return 'bg-orange-100 text-orange-700';
+  if (l.includes('kurang')) return 'bg-amber-100 text-amber-700';
+  if (l.includes('lebih')) return 'bg-orange-100 text-orange-700';
   return 'bg-emerald-100 text-emerald-700';
 };
 
@@ -21,13 +20,21 @@ const classColorBar = (cls) => {
   if (!cls) return 'bg-slate-400';
   const l = cls.toLowerCase();
   if (l.includes('buruk')) return 'bg-rose-500';
-  if (l.includes('kurang') || l.includes('wasted')) return 'bg-amber-500';
-  if (l.includes('obesitas')) return 'bg-purple-500';
-  if (l.includes('lebih') || l.includes('overweight') || l.includes('berisiko')) return 'bg-orange-500';
+  if (l.includes('kurang')) return 'bg-amber-500';
+  if (l.includes('lebih')) return 'bg-orange-500';
   return 'bg-emerald-500';
 };
 
-// ─── Sub-components ─────────────────────────────────────────────────────────
+const classColorHex = (cls) => {
+  if (!cls) return '#94a3b8';
+  const l = cls.toLowerCase();
+  if (l.includes('buruk')) return '#ef4444';
+  if (l.includes('kurang')) return '#f59e0b';
+  if (l.includes('lebih')) return '#f97316';
+  return '#10b981';
+};
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
 
 const SectionCard = ({ icon: Icon, title, subtitle, children, color = 'blue' }) => (
   <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
@@ -60,55 +67,143 @@ const Collapsible = ({ title, children, defaultOpen = false }) => {
   );
 };
 
+// ─── Confusion Matrix ────────────────────────────────────────────────────────
+
+const ConfusionMatrix = ({ matrix, classes }) => {
+  if (!matrix || !classes || classes.length === 0) return null;
+
+  return (
+    <div className="overflow-x-auto">
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
+        Baris = Aktual &nbsp;·&nbsp; Kolom = Prediksi
+      </p>
+      <table className="text-xs border-collapse">
+        <thead>
+          <tr>
+            <th className="px-3 py-2 text-slate-400 font-bold text-[10px] text-right">Aktual ↓ / Prediksi →</th>
+            {classes.map((cls) => (
+              <th key={cls} className="px-3 py-2 text-center">
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${classColor(cls)}`}>
+                  {cls.split('(')[0].trim()}
+                </span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {classes.map((actual) => (
+            <tr key={actual} className="border-t border-slate-100">
+              <td className="px-3 py-2 text-right">
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${classColor(actual)}`}>
+                  {actual.split('(')[0].trim()}
+                </span>
+              </td>
+              {classes.map((pred) => {
+                const val = matrix[actual]?.[pred] ?? 0;
+                const isDiag = actual === pred;
+                return (
+                  <td
+                    key={pred}
+                    className={`px-3 py-2 text-center font-black text-sm rounded ${
+                      isDiag
+                        ? val > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-400'
+                        : val > 0 ? 'bg-rose-50 text-rose-600' : 'text-slate-300'
+                    }`}
+                  >
+                    {val}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+// ─── Per-Class Metrics Table ─────────────────────────────────────────────────
+
+const MetricsTable = ({ perClass, macro, classes }) => {
+  if (!perClass || !classes) return null;
+  const fmt = (v) => (v * 100).toFixed(1) + '%';
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-slate-100">
+            <th className="pb-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest pr-4">Kelas</th>
+            <th className="pb-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest px-3">Precision</th>
+            <th className="pb-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest px-3">Recall</th>
+            <th className="pb-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest px-3">F1-Score</th>
+            <th className="pb-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest px-3">TP</th>
+            <th className="pb-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest px-3">FP</th>
+            <th className="pb-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest px-3">FN</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-50">
+          {classes.map((cls) => {
+            const m = perClass[cls];
+            if (!m) return null;
+            return (
+              <tr key={cls} className="hover:bg-slate-50 transition-colors">
+                <td className="py-3 pr-4">
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${classColor(cls)}`}>
+                    {cls}
+                  </span>
+                </td>
+                <td className="py-3 text-center font-black text-slate-700">{fmt(m.precision)}</td>
+                <td className="py-3 text-center font-black text-slate-700">{fmt(m.recall)}</td>
+                <td className="py-3 text-center">
+                  <span className={`font-black ${m.f1 >= 0.7 ? 'text-emerald-600' : m.f1 >= 0.4 ? 'text-amber-600' : 'text-rose-600'}`}>
+                    {fmt(m.f1)}
+                  </span>
+                </td>
+                <td className="py-3 text-center text-emerald-600 font-black">{m.TP}</td>
+                <td className="py-3 text-center text-rose-400 font-medium">{m.FP}</td>
+                <td className="py-3 text-center text-amber-400 font-medium">{m.FN}</td>
+              </tr>
+            );
+          })}
+          {/* Macro average */}
+          {macro && (
+            <tr className="border-t-2 border-slate-200 bg-slate-50">
+              <td className="py-3 pr-4 font-black text-slate-600 text-[10px] uppercase tracking-widest">Macro Avg</td>
+              <td className="py-3 text-center font-black text-slate-800">{fmt(macro.precision)}</td>
+              <td className="py-3 text-center font-black text-slate-800">{fmt(macro.recall)}</td>
+              <td className="py-3 text-center font-black text-slate-800">{fmt(macro.f1)}</td>
+              <td colSpan={3} />
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
 // ─── Data Source Selector ────────────────────────────────────────────────────
 
 const DATA_SOURCES = [
-  {
-    key: 'main',
-    label: 'Data Utama',
-    desc: 'Hanya data pemeriksaan nyata',
-    icon: Database,
-    color: 'blue',
-    bg: 'bg-blue-50 border-blue-200',
-    ring: 'ring-blue-500',
-    text: 'text-blue-700',
-  },
-  {
-    key: 'dummy',
-    label: 'Data Dummy',
-    desc: 'Hanya data sintetis/dummy',
-    icon: FlaskConical,
-    color: 'teal',
-    bg: 'bg-teal-50 border-teal-200',
-    ring: 'ring-teal-500',
-    text: 'text-teal-700',
-  },
-  {
-    key: 'both',
-    label: 'Gabungan',
-    desc: 'Data utama + data dummy',
-    icon: Layers,
-    color: 'violet',
-    bg: 'bg-violet-50 border-violet-200',
-    ring: 'ring-violet-500',
-    text: 'text-violet-700',
-  },
+  { key: 'main',  label: 'Data Utama',  desc: 'Hanya data pemeriksaan nyata',      icon: Database,    color: 'blue',   bg: 'bg-blue-50 border-blue-200',   ring: 'ring-blue-500',   text: 'text-blue-700'   },
+  { key: 'dummy', label: 'Data Dummy',  desc: 'Hanya data sintetis/dummy',          icon: FlaskConical, color: 'teal',  bg: 'bg-teal-50 border-teal-200',   ring: 'ring-teal-500',   text: 'text-teal-700'   },
+  { key: 'both',  label: 'Gabungan',    desc: 'Data utama + data dummy',            icon: Layers,      color: 'violet', bg: 'bg-violet-50 border-violet-200', ring: 'ring-violet-500', text: 'text-violet-700' },
 ];
 
-// ─── Main Component ─────────────────────────────────────────────────────────
+// ─── Main Component ──────────────────────────────────────────────────────────
 
 const NaiveBayesTrain = () => {
   const [trainingData, setTrainingData] = useState(null);
-  const [models, setModels] = useState([]);
-  const [latestModel, setLatestModel] = useState(null);
-  const [loading, setLoading] = useState({ data: false, train: false, models: false });
-  const [trainResult, setTrainResult] = useState(null);
-  const [error, setError] = useState(null);
-  const [modelName, setModelName] = useState('');
-  const [dataSource, setDataSource] = useState('main');
+  const [models, setModels]             = useState([]);
+  const [latestModel, setLatestModel]   = useState(null);
+  const [loading, setLoading]           = useState({ data: false, train: false, models: false });
+  const [trainResult, setTrainResult]   = useState(null);
+  const [error, setError]               = useState(null);
+  const [modelName, setModelName]       = useState('');
+  const [dataSource, setDataSource]     = useState('main');
 
   const fetchAll = useCallback(async () => {
-    setLoading(l => ({ ...l, data: true, models: true }));
+    setLoading((l) => ({ ...l, data: true, models: true }));
     try {
       const [dataRes, modelsRes] = await Promise.all([
         api.get('/naive-bayes/training-data'),
@@ -124,14 +219,14 @@ const NaiveBayesTrain = () => {
     } catch (e) {
       console.error(e);
     } finally {
-      setLoading(l => ({ ...l, data: false, models: false }));
+      setLoading((l) => ({ ...l, data: false, models: false }));
     }
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const handleTrain = async () => {
-    setLoading(l => ({ ...l, train: true }));
+    setLoading((l) => ({ ...l, train: true }));
     setError(null);
     setTrainResult(null);
     try {
@@ -145,7 +240,7 @@ const NaiveBayesTrain = () => {
     } catch (e) {
       setError(e.response?.data?.message || 'Gagal melatih model.');
     } finally {
-      setLoading(l => ({ ...l, train: false }));
+      setLoading((l) => ({ ...l, train: false }));
     }
   };
 
@@ -161,10 +256,18 @@ const NaiveBayesTrain = () => {
 
   const displayModel = trainResult || latestModel;
 
-  // Compute available data count for selected source
-  const mainCount = trainingData?.total ?? 0;
+  const mainCount  = trainingData?.total    ?? 0;
   const dummyCount = trainingData?.dummyTotal ?? 0;
-  const availableCount = dataSource === 'main' ? mainCount : dataSource === 'dummy' ? dummyCount : mainCount + dummyCount;
+  const availableCount =
+    dataSource === 'main'  ? mainCount  :
+    dataSource === 'dummy' ? dummyCount :
+    mainCount + dummyCount;
+
+  const featureLabels = {
+    z_bbu:  'Z-score BB/U',
+    z_tbu:  'Z-score TB/U',
+    z_bbtb: 'Z-score BB/TB',
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-700 pb-12">
@@ -174,23 +277,24 @@ const NaiveBayesTrain = () => {
           <div className="bg-violet-600 p-2 rounded-2xl shadow-lg shadow-violet-100">
             <Brain className="text-white" size={32} />
           </div>
-          Naive Bayes
+          Gaussian Naive Bayes
           <span className="text-xs bg-violet-900 text-white px-3 py-1 rounded-full font-black uppercase tracking-widest">Training</span>
         </h1>
         <p className="text-slate-500 mt-2 text-sm font-semibold max-w-xl">
-          Latih model klasifikasi status gizi. Pilih sumber data:{' '}
-          <span className="text-violet-600">data utama, dummy, atau keduanya.</span>
+          Latih model Gaussian NB menggunakan fitur{' '}
+          <span className="text-violet-600">Z-score WHO (BB/U, TB/U, BB/TB)</span>.
+          Akurasi dievaluasi pada test set terpisah (80/20 stratified split).
         </p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Data Utama', value: mainCount, color: 'blue' },
-          { label: 'Data Dummy', value: dummyCount, color: 'teal' },
-          { label: 'Model Tersimpan', value: models.length, color: 'violet' },
-          { label: 'Akurasi Terbaru', value: models[0]?.akurasi != null ? `${models[0].akurasi}%` : '—', color: 'emerald' },
-        ].map(stat => (
+          { label: 'Data Utama',       value: mainCount,  color: 'blue'   },
+          { label: 'Data Dummy',       value: dummyCount, color: 'teal'   },
+          { label: 'Model Tersimpan',  value: models.length, color: 'violet' },
+          { label: 'Akurasi Test Set', value: models[0]?.akurasi != null ? `${models[0].akurasi}%` : '—', color: 'emerald' },
+        ].map((stat) => (
           <div key={stat.label} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
             <p className={`text-3xl font-black text-${stat.color}-600`}>{stat.value}</p>
@@ -215,17 +319,17 @@ const NaiveBayesTrain = () => {
               <input
                 type="text"
                 value={modelName}
-                onChange={e => setModelName(e.target.value)}
-                placeholder={`Model Naive Bayes - ${new Date().toLocaleDateString('id-ID')}`}
+                onChange={(e) => setModelName(e.target.value)}
+                placeholder={`Gaussian NB - ${new Date().toLocaleDateString('id-ID')}`}
                 className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-transparent"
               />
             </div>
 
-            {/* Data Source Selector */}
+            {/* Data Source */}
             <div>
               <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Sumber Data Pelatihan</label>
               <div className="space-y-2">
-                {DATA_SOURCES.map(src => {
+                {DATA_SOURCES.map((src) => {
                   const count = src.key === 'main' ? mainCount : src.key === 'dummy' ? dummyCount : mainCount + dummyCount;
                   const isSelected = dataSource === src.key;
                   const SrcIcon = src.icon;
@@ -234,9 +338,7 @@ const NaiveBayesTrain = () => {
                       key={src.key}
                       onClick={() => setDataSource(src.key)}
                       className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left ${
-                        isSelected
-                          ? `${src.bg} ring-2 ${src.ring} ring-offset-1`
-                          : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                        isSelected ? `${src.bg} ring-2 ${src.ring} ring-offset-1` : 'bg-slate-50 border-slate-200 hover:border-slate-300'
                       }`}
                     >
                       <div className={`p-1.5 rounded-xl ${isSelected ? `bg-${src.color}-100` : 'bg-white'}`}>
@@ -255,10 +357,9 @@ const NaiveBayesTrain = () => {
               </div>
             </div>
 
-            {/* Data source info */}
             {dataSource === 'both' && (
               <div className="p-3 bg-violet-50 border border-violet-100 rounded-2xl text-[10px] font-semibold text-violet-600">
-                Menggunakan {mainCount} data utama + {dummyCount} data dummy = {mainCount + dummyCount} total data latih
+                {mainCount} data utama + {dummyCount} data dummy = {mainCount + dummyCount} total data latih
               </div>
             )}
 
@@ -273,9 +374,9 @@ const NaiveBayesTrain = () => {
               <div className="flex items-start gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl">
                 <CheckCircle2 size={18} className="text-emerald-500 mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="text-emerald-700 text-xs font-black">Model berhasil dilatih!</p>
+                  <p className="text-emerald-700 text-xs font-black">Model Gaussian NB berhasil dilatih!</p>
                   <p className="text-emerald-600 text-xs mt-1">
-                    {trainResult.totalRecords} data
+                    {trainResult.trainCount} train · {trainResult.testCount} test
                     {trainResult.mainCount != null && ` (${trainResult.mainCount} utama + ${trainResult.dummyCount} dummy)`}
                     {' '}· {trainResult.activeClasses?.length} kelas · Akurasi {trainResult.accuracy}%
                   </p>
@@ -329,13 +430,13 @@ const NaiveBayesTrain = () => {
           </SectionCard>
         </div>
 
-        {/* Right: Calculation Display */}
+        {/* Right: Results */}
         <div className="lg:col-span-8 space-y-5">
           {/* Training Data Preview */}
           {trainingData && (
             <SectionCard
               icon={Table2}
-              title="Data Latih (Tampilan Awal)"
+              title="Data Latih (Preview)"
               subtitle={`${trainingData.total} data utama · ${dummyCount} data dummy`}
               color="violet"
             >
@@ -343,21 +444,21 @@ const NaiveBayesTrain = () => {
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="border-b border-slate-100">
-                      {['Nama', 'Umur', '→', 'BB (kg)', '→', 'TB (cm)', '→', 'Kelas'].map((h, i) => (
-                        <th key={i} className={`pb-3 font-black uppercase tracking-wide ${h === '→' ? 'text-slate-300 text-center' : 'text-slate-500 pr-3'}`}>{h}</th>
+                      {['Nama', 'Umur', 'BB', 'TB', 'Z BB/U', 'Z TB/U', 'Z BB/TB', 'Kelas'].map((h, i) => (
+                        <th key={i} className="pb-3 font-black uppercase tracking-wide text-slate-400 pr-3 text-[10px]">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {trainingData.records.slice(0, 10).map(r => (
+                    {trainingData.records.slice(0, 10).map((r) => (
                       <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                         <td className="py-2 pr-3 font-semibold text-slate-700 max-w-[80px] truncate">{r.nama || '—'}</td>
                         <td className="py-2 pr-2 text-slate-600">{r.umur_bulan}</td>
-                        <td className="py-2 text-slate-300 text-center">→</td>
                         <td className="py-2 pr-2 text-slate-600">{r.berat_badan}</td>
-                        <td className="py-2 text-slate-300 text-center">→</td>
                         <td className="py-2 pr-2 text-slate-600">{r.tinggi_badan}</td>
-                        <td className="py-2 text-slate-300 text-center">→</td>
+                        <td className="py-2 pr-2 font-mono text-[10px] text-slate-500">{r.zscores?.z_bbu ?? '—'}</td>
+                        <td className="py-2 pr-2 font-mono text-[10px] text-slate-500">{r.zscores?.z_tbu ?? '—'}</td>
+                        <td className="py-2 pr-2 font-mono text-[10px] text-slate-500">{r.zscores?.z_bbtb ?? '—'}</td>
                         <td className="py-2">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${classColor(r.kategori_gizi)}`}>
                             {r.kategori_gizi?.split('(')[0].trim() || '—'}
@@ -376,10 +477,10 @@ const NaiveBayesTrain = () => {
             </SectionCard>
           )}
 
-          {/* Model Calculation Tables */}
+          {/* Model Results */}
           {displayModel && (
             <>
-              {/* Data source info badge */}
+              {/* Data source badge */}
               {displayModel.data_source && (
                 <div className="flex items-center gap-2 p-3 bg-violet-50 border border-violet-100 rounded-2xl text-xs text-violet-700 font-semibold">
                   <Info size={14} />
@@ -390,25 +491,28 @@ const NaiveBayesTrain = () => {
                       ({displayModel.mainCount} utama + {displayModel.dummyCount} dummy)
                     </span>
                   )}
+                  {displayModel.trainCount != null && (
+                    <span className="ml-auto text-violet-500 font-medium">
+                      {displayModel.trainCount} train / {displayModel.testCount} test (80/20 stratified)
+                    </span>
+                  )}
                 </div>
               )}
 
               {/* Priors */}
               <SectionCard icon={TrendingUp} title="Probabilitas Prior P(Kelas)" subtitle="Frekuensi tiap kelas dalam data latih" color="emerald">
                 <div className="space-y-3">
-                  {displayModel.activeClasses.map(cls => {
+                  {displayModel.activeClasses.map((cls) => {
                     const count = displayModel.classCounts?.[cls] ?? 0;
                     const prior = displayModel.priors[cls];
-                    const pct = (prior * 100).toFixed(1);
+                    const pct   = (prior * 100).toFixed(1);
                     return (
                       <div key={cls} className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${classColor(cls)}`}>
-                            {cls.split('(')[0].trim()}
-                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${classColor(cls)}`}>{cls}</span>
                           <div className="text-right">
                             <span className="font-black text-slate-800 text-sm">{pct}%</span>
-                            <span className="text-slate-400 text-[10px] ml-2">({count} / {displayModel.totalRecords})</span>
+                            <span className="text-slate-400 text-[10px] ml-2">({count} / {displayModel.trainCount ?? displayModel.totalRecords})</span>
                           </div>
                         </div>
                         <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -420,67 +524,102 @@ const NaiveBayesTrain = () => {
                 </div>
               </SectionCard>
 
-              {/* Likelihood Tables */}
-              {['umur_bulan', 'berat_badan', 'tinggi_badan'].map(fKey => {
-                const featureLabel = { umur_bulan: 'Umur Bulan', berat_badan: 'Berat Badan', tinggi_badan: 'Tinggi Badan' }[fKey];
-                const bins = Object.keys(displayModel.likelihoods[displayModel.activeClasses[0]]?.[fKey] ?? {});
-                return (
-                  <Collapsible key={fKey} title={`P(${featureLabel} | Kelas) — Likelihood dengan Laplace Smoothing`} defaultOpen={fKey === 'umur_bulan'}>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left">
-                        <thead>
-                          <tr className="border-b border-slate-100">
-                            <th className="pb-3 text-[10px] font-black text-slate-400 uppercase pr-4">Kelas</th>
-                            {bins.map(b => (
-                              <th key={b} className="pb-3 text-[10px] font-black text-slate-500 uppercase text-center px-2">{b}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                          {displayModel.activeClasses.map(cls => (
-                            <tr key={cls} className="hover:bg-slate-50 transition-colors">
-                              <td className="py-3 pr-4">
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${classColor(cls)}`}>
-                                  {cls.split('(')[0].trim()}
-                                </span>
+              {/* Gaussian Parameters */}
+              <Collapsible title="Parameter Gaussian P(x | Kelas) — Mean & Standar Deviasi" defaultOpen={true}>
+                <p className="text-[10px] text-slate-400 font-medium mb-4 flex items-center gap-1">
+                  <Sigma size={10} /> P(x|C) = (1/√(2πσ²)) · exp(−(x−μ)² / (2σ²))
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-100">
+                        <th className="pb-3 text-[10px] font-black text-slate-400 uppercase pr-4">Kelas</th>
+                        {(displayModel.featureKeys || ['z_bbu', 'z_tbu', 'z_bbtb']).map((fKey) => (
+                          <th key={fKey} className="pb-3 text-[10px] font-black text-slate-500 uppercase text-center px-3">
+                            {featureLabels[fKey] || fKey}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {displayModel.activeClasses.map((cls) => (
+                        <tr key={cls} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-3 pr-4">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${classColor(cls)}`}>{cls}</span>
+                          </td>
+                          {(displayModel.featureKeys || ['z_bbu', 'z_tbu', 'z_bbtb']).map((fKey) => {
+                            const params = displayModel.gaussianParams?.[cls]?.[fKey];
+                            return (
+                              <td key={fKey} className="py-3 text-center">
+                                {params ? (
+                                  <div>
+                                    <div className="font-black text-slate-800 text-xs">μ = {params.mean.toFixed(3)}</div>
+                                    <div className="text-[9px] text-slate-400 mt-0.5">σ = {Math.sqrt(params.variance).toFixed(3)}</div>
+                                  </div>
+                                ) : '—'}
                               </td>
-                              {bins.map(b => {
-                                const entry = displayModel.likelihoods[cls]?.[fKey]?.[b];
-                                return (
-                                  <td key={b} className="py-3 text-center">
-                                    <div className="font-black text-slate-800 text-xs">{entry ? entry.probability.toFixed(4) : '—'}</div>
-                                    {entry && <div className="text-[9px] text-slate-400 mt-0.5">{entry.smoothed_numerator}/{entry.smoothed_denominator}</div>}
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    <p className="text-[10px] text-slate-400 mt-3 font-medium flex items-center gap-1">
-                      <Info size={10} /> P(x|C) = (count + 1) / (|C| + jumlah_bin) — Laplace smoothing
-                    </p>
-                  </Collapsible>
-                );
-              })}
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-3 font-medium">
+                  μ = rata-rata fitur per kelas &nbsp;·&nbsp; σ = standar deviasi
+                </p>
+              </Collapsible>
 
-              {/* Binning Guide */}
-              <SectionCard icon={Info} title="Panduan Diskretisasi Fitur" subtitle="Aturan binning yang digunakan" color="amber">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {[
-                    { label: 'Umur Bulan', bins: [['bayi', '0–11 bln'], ['batita', '12–35 bln'], ['balita', '36–60 bln']] },
-                    { label: 'Berat Badan', bins: [['sangat_kurang', '<7 kg'], ['kurang', '7–9 kg'], ['normal', '9–16 kg'], ['lebih', '>16 kg']] },
-                    { label: 'Tinggi Badan', bins: [['sangat_pendek', '<65 cm'], ['pendek', '65–75 cm'], ['normal', '75–100 cm'], ['tinggi', '>100 cm']] },
-                  ].map(f => (
-                    <div key={f.label} className="space-y-2">
-                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{f.label}</p>
-                      {f.bins.map(([lbl, range]) => (
-                        <div key={lbl} className="flex items-center justify-between p-2 bg-slate-50 rounded-xl">
-                          <span className="text-[10px] font-bold text-slate-600 font-mono">{lbl}</span>
-                          <span className="text-[10px] text-slate-400">{range}</span>
+              {/* Evaluation Metrics */}
+              {displayModel.metrics && (
+                <SectionCard icon={Target} title="Evaluasi Model" subtitle="Dievaluasi pada test set yang terpisah (20% data)" color="rose">
+                  <div className="space-y-6">
+                    {/* Accuracy highlight */}
+                    <div className="grid grid-cols-4 gap-3">
+                      {[
+                        { label: 'Akurasi Test',  value: `${displayModel.accuracy}%`,                       color: 'emerald' },
+                        { label: 'Macro Precision', value: `${(displayModel.metrics.macro?.precision * 100).toFixed(1)}%`, color: 'blue'    },
+                        { label: 'Macro Recall',    value: `${(displayModel.metrics.macro?.recall * 100).toFixed(1)}%`,    color: 'violet'  },
+                        { label: 'Macro F1',        value: `${(displayModel.metrics.macro?.f1 * 100).toFixed(1)}%`,        color: 'amber'   },
+                      ].map((s) => (
+                        <div key={s.label} className={`p-4 rounded-2xl bg-${s.color}-50 border border-${s.color}-100 text-center`}>
+                          <p className={`text-[9px] font-black uppercase tracking-widest text-${s.color}-400 mb-1`}>{s.label}</p>
+                          <p className={`text-2xl font-black text-${s.color}-700`}>{s.value}</p>
                         </div>
                       ))}
+                    </div>
+
+                    {/* Confusion Matrix */}
+                    <Collapsible title="Confusion Matrix" defaultOpen={true}>
+                      <ConfusionMatrix matrix={displayModel.metrics.matrix} classes={displayModel.activeClasses} />
+                    </Collapsible>
+
+                    {/* Per-class metrics */}
+                    <Collapsible title="Precision · Recall · F1 per Kelas" defaultOpen={true}>
+                      <MetricsTable
+                        perClass={displayModel.metrics.perClass}
+                        macro={displayModel.metrics.macro}
+                        classes={displayModel.activeClasses}
+                      />
+                    </Collapsible>
+                  </div>
+                </SectionCard>
+              )}
+
+              {/* Feature Info */}
+              <SectionCard icon={Info} title="Fitur yang Digunakan (Z-score WHO)" subtitle="3 fitur numerik turunan dari standar WHO/Kemenkes" color="amber">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[
+                    { key: 'z_bbu',  label: 'Z-score BB/U', desc: 'Berat Badan per Umur', range: 'Sangat Kurang < -3 ≤ Kurang < -2 ≤ Normal ≤ 1 < Risiko' },
+                    { key: 'z_tbu',  label: 'Z-score TB/U', desc: 'Tinggi Badan per Umur', range: 'Sangat Pendek < -3 ≤ Pendek < -2 ≤ Normal ≤ 3 < Tinggi'  },
+                    { key: 'z_bbtb', label: 'Z-score BB/TB', desc: 'Berat Badan per Tinggi (indikator utama)', range: 'Buruk < -3 ≤ Kurang < -2 ≤ Baik ≤ 2 < Lebih'   },
+                  ].map((f) => (
+                    <div key={f.key} className="space-y-2">
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{f.label}</p>
+                      <p className="text-xs font-bold text-slate-700">{f.desc}</p>
+                      <div className="p-2 bg-slate-50 rounded-xl">
+                        <span className="text-[10px] text-slate-500 font-mono">{f.range}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -491,7 +630,7 @@ const NaiveBayesTrain = () => {
           {!displayModel && !loading.data && (
             <div className="flex flex-col items-center justify-center h-64 bg-white rounded-3xl border border-dashed border-slate-200">
               <Brain size={40} className="text-slate-200 mb-4" />
-              <p className="text-slate-400 font-bold text-sm">Latih model untuk melihat tabel probabilitas</p>
+              <p className="text-slate-400 font-bold text-sm">Latih model untuk melihat parameter dan evaluasi</p>
             </div>
           )}
         </div>

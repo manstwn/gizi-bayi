@@ -1,229 +1,295 @@
 /**
- * Naive Bayes Service
- * Implements a Multinomial Naive Bayes classifier for nutritional status classification.
- * Uses Laplace (add-1) smoothing to handle zero probabilities.
+ * Gaussian Naive Bayes Service
+ *
+ * Uses WHO Z-score features (BB/U, TB/U, BB/TB) for nutritional status
+ * classification. 4 canonical output classes. Includes stratified 80/20
+ * train-test split and full evaluation metrics (confusion matrix, precision,
+ * recall, F1).
  */
 
-// ─── Feature Definitions ─────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-const FEATURE_BINS = {
-  umur_bulan: {
-    label: 'Umur (Bulan)',
-    bins: [
-      { label: 'bayi', min: 0, max: 11 },
-      { label: 'batita', min: 12, max: 35 },
-      { label: 'balita', min: 36, max: 60 },
-    ],
-  },
-  berat_badan: {
-    label: 'Berat Badan (kg)',
-    bins: [
-      { label: 'sangat_kurang', min: 0, max: 6.99 },
-      { label: 'kurang', min: 7, max: 8.99 },
-      { label: 'normal', min: 9, max: 15.99 },
-      { label: 'lebih', min: 16, max: Infinity },
-    ],
-  },
-  tinggi_badan: {
-    label: 'Tinggi Badan (cm)',
-    bins: [
-      { label: 'sangat_pendek', min: 0, max: 64.99 },
-      { label: 'pendek', min: 65, max: 74.99 },
-      { label: 'normal', min: 75, max: 99.99 },
-      { label: 'tinggi', min: 100, max: Infinity },
-    ],
-  },
+const CLASSES = ['Gizi Buruk', 'Gizi Kurang', 'Gizi Baik', 'Gizi Lebih'];
+
+const FEATURE_KEYS = ['z_bbu', 'z_tbu', 'z_bbtb'];
+
+const FEATURE_LABELS = {
+  z_bbu:  'Z-score BB/U (Berat Badan per Umur)',
+  z_tbu:  'Z-score TB/U (Tinggi Badan per Umur)',
+  z_bbtb: 'Z-score BB/TB (Berat Badan per Tinggi Badan)',
 };
 
-const CLASSES = ['Gizi Buruk (Severely Wasted)', 'Gizi Kurang (Wasted)', 'Gizi Baik (Normal)', 'Berisiko Gizi Lebih', 'Gizi Lebih (Overweight)', 'Obesitas'];
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Class Normalisation ─────────────────────────────────────────────────────
 
 /**
- * Bin a single numeric value according to feature definition.
- */
-function binValue(featureKey, value) {
-  const feature = FEATURE_BINS[featureKey];
-  if (!feature) return 'unknown';
-  for (const bin of feature.bins) {
-    if (value >= bin.min && value <= bin.max) return bin.label;
-  }
-  return feature.bins[feature.bins.length - 1].label;
-}
-
-/**
- * Discretize a record's continuous features into bins.
- */
-function binRecord(record) {
-  return {
-    umur_bulan: binValue('umur_bulan', record.umur_bulan),
-    berat_badan: binValue('berat_badan', record.berat_badan),
-    tinggi_badan: binValue('tinggi_badan', record.tinggi_badan),
-    kategori_gizi: normalizeClass(record.kategori_gizi),
-  };
-}
-
-/**
- * Normalize class label — map any variant to our canonical classes.
+ * Map any label (including old 6-class labels) to one of 4 canonical classes.
  */
 function normalizeClass(label) {
-  if (!label) return 'Gizi Baik (Normal)';
-  // Already a canonical label?
+  if (!label) return 'Gizi Baik';
   if (CLASSES.includes(label)) return label;
-  // Fallback mapping for legacy labels
   const l = label.toLowerCase();
-  if (l.includes('buruk') || l.includes('severely wasted')) return 'Gizi Buruk (Severely Wasted)';
-  if (l.includes('kurang') || l.includes('wasted')) return 'Gizi Kurang (Wasted)';
-  if (l.includes('lebih') || l.includes('overweight')) return 'Gizi Lebih (Overweight)';
-  if (l.includes('obesitas')) return 'Obesitas';
-  if (l.includes('berisiko')) return 'Berisiko Gizi Lebih';
-  return 'Gizi Baik (Normal)';
+  if (l.includes('buruk') || l.includes('severely')) return 'Gizi Buruk';
+  if (l.includes('kurang') || l.includes('wasted'))   return 'Gizi Kurang';
+  if (
+    l.includes('lebih') || l.includes('overweight') ||
+    l.includes('obesitas') || l.includes('berisiko')
+  ) return 'Gizi Lebih';
+  return 'Gizi Baik';
 }
 
-// ─── Training ────────────────────────────────────────────────────────────────
+// ─── Statistics Helpers ───────────────────────────────────────────────────────
 
 /**
- * Train a Naive Bayes model from an array of pemeriksaan records.
- * @param {Array} records - Raw DB records with {umur_bulan, berat_badan, tinggi_badan, kategori_gizi}
- * @returns {Object} model — includes priors, likelihoods, metadata, and training steps for display
+ * Compute mean and variance of a numeric array.
+ * Returns { mean, variance }.  variance floored at 1e-6 to prevent /0.
+ */
+function meanVariance(arr) {
+  const n = arr.length;
+  if (n === 0) return { mean: 0, variance: 1 };
+  const mean = arr.reduce((s, v) => s + v, 0) / n;
+  const variance = Math.max(
+    arr.reduce((s, v) => s + (v - mean) ** 2, 0) / n,
+    1e-6
+  );
+  return { mean, variance };
+}
+
+/**
+ * Gaussian probability density function.
+ * P(x | μ, σ²) = 1/√(2πσ²) · exp(-(x-μ)²/(2σ²))
+ */
+function gaussianPDF(x, mean, variance) {
+  const v = variance || 1e-6;
+  return (
+    (1 / Math.sqrt(2 * Math.PI * v)) *
+    Math.exp(-((x - mean) ** 2) / (2 * v))
+  );
+}
+
+// ─── Stratified Split ─────────────────────────────────────────────────────────
+
+/**
+ * Stratified train-test split.  Ensures every class is represented in both sets.
+ * @param {Array}  records   - objects with { kategori_gizi, ... }
+ * @param {number} testRatio - fraction for test set (default 0.2)
+ */
+function stratifiedSplit(records, testRatio = 0.2) {
+  const byClass = {};
+  records.forEach((r) => {
+    const cls = r.kategori_gizi;
+    if (!byClass[cls]) byClass[cls] = [];
+    byClass[cls].push(r);
+  });
+
+  const train = [];
+  const test  = [];
+
+  Object.values(byClass).forEach((classRecords) => {
+    const shuffled = [...classRecords].sort(() => Math.random() - 0.5);
+    // Guarantee at least 1 sample in test for any class that has ≥ 2 samples
+    const nTest = classRecords.length >= 2
+      ? Math.max(1, Math.round(shuffled.length * testRatio))
+      : 0;
+    test.push(...shuffled.slice(0, nTest));
+    train.push(...shuffled.slice(nTest));
+  });
+
+  return { train, test };
+}
+
+// ─── Evaluation Metrics ───────────────────────────────────────────────────────
+
+/**
+ * Compute confusion matrix + per-class precision, recall, F1.
+ * @param {string[]} predictions
+ * @param {string[]} actuals
+ * @param {string[]} classes
+ */
+function computeMetrics(predictions, actuals, classes) {
+  // matrix[actual][predicted] = count
+  const matrix = {};
+  classes.forEach((a) => {
+    matrix[a] = {};
+    classes.forEach((p) => { matrix[a][p] = 0; });
+  });
+
+  predictions.forEach((pred, i) => {
+    const actual = actuals[i];
+    if (matrix[actual] && matrix[actual][pred] !== undefined) {
+      matrix[actual][pred]++;
+    }
+  });
+
+  const perClass = {};
+  classes.forEach((cls) => {
+    const TP = matrix[cls][cls];
+    const FP = classes.reduce((s, a) => s + (a !== cls ? matrix[a][cls] : 0), 0);
+    const FN = classes.reduce((s, p) => s + (p !== cls ? matrix[cls][p] : 0), 0);
+    const precision = TP + FP > 0 ? TP / (TP + FP) : 0;
+    const recall    = TP + FN > 0 ? TP / (TP + FN) : 0;
+    const f1 = precision + recall > 0
+      ? (2 * precision * recall) / (precision + recall)
+      : 0;
+    perClass[cls] = {
+      TP, FP, FN,
+      precision: parseFloat(precision.toFixed(4)),
+      recall:    parseFloat(recall.toFixed(4)),
+      f1:        parseFloat(f1.toFixed(4)),
+    };
+  });
+
+  const n = classes.length;
+  const macro = {
+    precision: parseFloat((classes.reduce((s, c) => s + perClass[c].precision, 0) / n).toFixed(4)),
+    recall:    parseFloat((classes.reduce((s, c) => s + perClass[c].recall, 0) / n).toFixed(4)),
+    f1:        parseFloat((classes.reduce((s, c) => s + perClass[c].f1, 0) / n).toFixed(4)),
+  };
+
+  return { matrix, perClass, macro };
+}
+
+// ─── Training ─────────────────────────────────────────────────────────────────
+
+/**
+ * Train a Gaussian Naive Bayes model.
+ *
+ * @param {Array} records - each record must contain:
+ *   { z_bbu, z_tbu, z_bbtb, kategori_gizi }
+ *   (z-scores are computed by the controller before calling this function)
+ * @returns {Object} model - stored as JSON in the database
  */
 function trainModel(records) {
   if (!records || records.length === 0) {
     throw new Error('Tidak ada data untuk melatih model.');
   }
 
-  // 1. Discretize
-  const binnedRecords = records.map(binRecord);
+  // 1. Normalize class labels (handles legacy 6-class labels)
+  const normalized = records
+    .map((r) => ({ ...r, kategori_gizi: normalizeClass(r.kategori_gizi) }))
+    .filter((r) => r.z_bbu != null && r.z_tbu != null && r.z_bbtb != null);
 
-  // 2. Find active classes (only classes present in data)
-  const activeClasses = [...new Set(binnedRecords.map(r => r.kategori_gizi))];
-  const totalRecords = binnedRecords.length;
+  if (normalized.length === 0) {
+    throw new Error('Tidak ada record dengan Z-score yang valid.');
+  }
 
-  // 3. Class counts & priors
+  // 2. Stratified 80/20 split
+  const { train, test } = stratifiedSplit(normalized, 0.2);
+
+  // 3. Active classes (only classes with ≥ 1 training record)
+  const activeClasses = [...new Set(train.map((r) => r.kategori_gizi))].sort();
+
+  // 4. Class counts and priors (from training set)
   const classCounts = {};
-  activeClasses.forEach(c => { classCounts[c] = 0; });
-  binnedRecords.forEach(r => { classCounts[r.kategori_gizi]++; });
+  activeClasses.forEach((c) => { classCounts[c] = 0; });
+  train.forEach((r) => { if (classCounts[r.kategori_gizi] !== undefined) classCounts[r.kategori_gizi]++; });
 
+  const totalTrain = train.length;
   const priors = {};
-  activeClasses.forEach(c => {
-    priors[c] = classCounts[c] / totalRecords;
+  activeClasses.forEach((c) => {
+    priors[c] = classCounts[c] / totalTrain;
   });
 
-  // 4. Feature likelihoods (with Laplace smoothing)
-  const featureKeys = ['umur_bulan', 'berat_badan', 'tinggi_badan'];
-  const likelihoods = {}; // likelihoods[class][feature][binLabel] = probability
-
-  activeClasses.forEach(cls => {
-    likelihoods[cls] = {};
-    const classRecords = binnedRecords.filter(r => r.kategori_gizi === cls);
-    const classCount = classRecords.length;
-
-    featureKeys.forEach(fKey => {
-      likelihoods[cls][fKey] = {};
-      const bins = FEATURE_BINS[fKey].bins;
-      const numBins = bins.length;
-
-      // Count occurrences of each bin value for this class
-      const binCounts = {};
-      bins.forEach(b => { binCounts[b.label] = 0; });
-      classRecords.forEach(r => { binCounts[r[fKey]]++; });
-
-      // Apply Laplace smoothing: P(feature=v | class) = (count + 1) / (classCount + numBins)
-      bins.forEach(b => {
-        likelihoods[cls][fKey][b.label] = {
-          count: binCounts[b.label],
-          probability: (binCounts[b.label] + 1) / (classCount + numBins),
-          smoothed_numerator: binCounts[b.label] + 1,
-          smoothed_denominator: classCount + numBins,
-        };
-      });
+  // 5. Gaussian parameters: mean & variance per class per feature
+  const gaussianParams = {};
+  activeClasses.forEach((cls) => {
+    gaussianParams[cls] = {};
+    const classRecords = train.filter((r) => r.kategori_gizi === cls);
+    FEATURE_KEYS.forEach((fKey) => {
+      const values = classRecords
+        .map((r) => r[fKey])
+        .filter((v) => v != null && !isNaN(v));
+      gaussianParams[cls][fKey] = meanVariance(values);
     });
   });
 
-  // 5. Compute accuracy with simple leave-one-out on the training data
-  let correct = 0;
-  binnedRecords.forEach(r => {
-    const pred = predictFromModel({ priors, likelihoods, activeClasses, featureKeys }, r.umur_bulan, r.berat_badan, r.tinggi_badan, true /* already binned */);
-    if (pred.predicted_class === r.kategori_gizi) correct++;
-  });
-  const accuracy = totalRecords > 0 ? (correct / totalRecords) * 100 : 0;
+  // 6. Evaluate on test set
+  const modelSoFar = { priors, gaussianParams, activeClasses };
+  const testPredictions = test.map((r) =>
+    predictFromModel(modelSoFar, r.z_bbu, r.z_tbu, r.z_bbtb).predicted_class
+  );
+  const testActuals = test.map((r) => r.kategori_gizi);
+
+  const testCorrect = testPredictions.filter((p, i) => p === testActuals[i]).length;
+  const accuracy = test.length > 0
+    ? parseFloat(((testCorrect / test.length) * 100).toFixed(2))
+    : 0;
+
+  const metrics = computeMetrics(testPredictions, testActuals, activeClasses);
 
   return {
+    // Model parameters
     priors,
-    likelihoods,
+    gaussianParams,
     activeClasses,
-    featureKeys,
-    totalRecords,
+    featureKeys: FEATURE_KEYS,
+    featureLabels: FEATURE_LABELS,
+
+    // Data stats
+    totalRecords: normalized.length,
+    trainCount:   train.length,
+    testCount:    test.length,
     classCounts,
-    accuracy: parseFloat(accuracy.toFixed(2)),
-    featureBins: FEATURE_BINS,
+
+    // Evaluation
+    accuracy,
+    metrics,
+
     trainedAt: new Date().toISOString(),
   };
 }
 
-// ─── Prediction ──────────────────────────────────────────────────────────────
+// ─── Prediction ───────────────────────────────────────────────────────────────
 
 /**
- * Run prediction using a saved model.
- * @param {Object} model - The model object (as stored in DB, parsed JSON)
- * @param {number|string} umur - age in months (or already-binned string if preBinned=true)
- * @param {number|string} bb - weight in kg (or already-binned)
- * @param {number|string} tb - height in cm (or already-binned)
- * @param {boolean} preBinned - if true, inputs are already bin labels
- * @returns {Object} prediction with steps, probabilities, predicted class
+ * Predict nutritional status using a saved Gaussian NB model.
+ *
+ * @param {Object} model     - model object (as stored / retrieved from DB)
+ * @param {number} z_bbu     - Z-score BB/U
+ * @param {number} z_tbu     - Z-score TB/U
+ * @param {number} z_bbtb    - Z-score BB/TB
+ * @returns {Object} prediction result with steps and probabilities
  */
-function predictFromModel(model, umur, bb, tb, preBinned = false) {
-  const { priors, likelihoods, activeClasses, featureKeys } = model;
+function predictFromModel(model, z_bbu, z_tbu, z_bbtb) {
+  const { priors, gaussianParams, activeClasses } = model;
 
-  // Bin the inputs
-  const binnedInputs = preBinned
-    ? { umur_bulan: umur, berat_badan: bb, tinggi_badan: tb }
-    : {
-        umur_bulan: binValue('umur_bulan', umur),
-        berat_badan: binValue('berat_badan', bb),
-        tinggi_badan: binValue('tinggi_badan', tb),
-      };
-
-  const steps = [];
+  const inputs = { z_bbu, z_tbu, z_bbtb };
+  const steps  = [];
   const scores = {};
 
-  activeClasses.forEach(cls => {
-    const prior = priors[cls];
-    let logScore = Math.log(prior);
+  activeClasses.forEach((cls) => {
+    const prior = priors[cls] || 0;
+    let logScore = Math.log(Math.max(prior, 1e-300));
     const featureProbs = {};
 
-    featureKeys.forEach(fKey => {
-      const binLabel = binnedInputs[fKey];
-      const entry = likelihoods[cls][fKey][binLabel];
-      const prob = entry ? entry.probability : 1 / (Object.keys(likelihoods[cls][fKey]).length + 1);
+    FEATURE_KEYS.forEach((fKey) => {
+      const params = gaussianParams[cls]?.[fKey] || { mean: 0, variance: 1 };
+      const x      = inputs[fKey];
+      const prob   = gaussianPDF(x, params.mean, params.variance);
+      const safeP  = Math.max(prob, 1e-300);
+
       featureProbs[fKey] = {
-        binLabel,
+        value:       x,
+        mean:        parseFloat(params.mean.toFixed(4)),
+        variance:    parseFloat(params.variance.toFixed(4)),
+        stddev:      parseFloat(Math.sqrt(params.variance).toFixed(4)),
         probability: prob,
-        numerator: entry ? entry.smoothed_numerator : 1,
-        denominator: entry ? entry.smoothed_denominator : Object.keys(likelihoods[cls][fKey]).length + 1,
       };
-      logScore += Math.log(prob);
+      logScore += Math.log(safeP);
     });
 
-    scores[cls] = {
-      prior,
-      featureProbs,
-      logScore,
-      score: Math.exp(logScore), // unnormalized posterior
-    };
-
+    const score = Math.exp(logScore);
+    scores[cls] = { prior, featureProbs, logScore, score };
     steps.push({ class: cls, prior, featureProbs, logScore });
   });
 
-  // Normalize to get probabilities (softmax over scores)
-  const scoreValues = Object.values(scores).map(s => s.score);
-  const totalScore = scoreValues.reduce((a, b) => a + b, 0);
+  // Normalise to posterior probabilities
+  const totalScore = Object.values(scores).reduce((s, v) => s + v.score, 0) || 1;
   const probabilities = {};
   let maxProb = -Infinity;
   let predictedClass = activeClasses[0];
 
-  activeClasses.forEach(cls => {
-    const prob = totalScore > 0 ? scores[cls].score / totalScore : 1 / activeClasses.length;
+  activeClasses.forEach((cls) => {
+    const prob = scores[cls].score / totalScore;
     probabilities[cls] = parseFloat((prob * 100).toFixed(4));
     if (prob > maxProb) {
       maxProb = prob;
@@ -235,19 +301,19 @@ function predictFromModel(model, umur, bb, tb, preBinned = false) {
     predicted_class: predictedClass,
     probabilities,
     scores,
-    binnedInputs,
+    inputs,
     steps,
     confidence: probabilities[predictedClass],
   };
 }
 
-// ─── Exports ─────────────────────────────────────────────────────────────────
+// ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
   trainModel,
   predictFromModel,
-  binRecord,
-  binValue,
-  FEATURE_BINS,
+  normalizeClass,
   CLASSES,
+  FEATURE_KEYS,
+  FEATURE_LABELS,
 };

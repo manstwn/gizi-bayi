@@ -2,16 +2,45 @@ const Pemeriksaan = require('../models/Pemeriksaan');
 const NaiveBayesModel = require('../models/NaiveBayesModel');
 const DummyData = require('../models/DummyData');
 const nbService = require('../services/naiveBayesService');
+const nutritionalStatusService = require('../services/nutritionalStatusService');
+
+// ─── Helper: compute Z-scores for a record ───────────────────────────────────
+
+/**
+ * Enriches a record with { z_bbu, z_tbu, z_bbtb } by calling the
+ * nutritionalStatusService.  Records where Z-scores cannot be computed
+ * (missing WHO reference) are dropped.
+ */
+function enrichWithZScores(records) {
+  const enriched = [];
+  for (const r of records) {
+    try {
+      const assessment = nutritionalStatusService.assess(
+        parseFloat(r.berat_badan),
+        parseFloat(r.tinggi_badan),
+        parseInt(r.umur_bulan)
+      );
+      enriched.push({
+        ...r,
+        z_bbu:  assessment.indices.bbu.z,
+        z_tbu:  assessment.indices.tbu.z,
+        z_bbtb: assessment.indices.bbtb.z,
+      });
+    } catch {
+      // Skip records that fail assessment
+    }
+  }
+  return enriched;
+}
 
 // ─── Train ────────────────────────────────────────────────────────────────────
 
 exports.trainModel = async (req, res) => {
   try {
     const { nama_model, data_source = 'main' } = req.body;
-    // data_source: 'main' | 'dummy' | 'both'
-
     const { Op } = require('sequelize');
-    let mainRecords = [];
+
+    let mainRecords  = [];
     let dummyRecords = [];
 
     if (data_source === 'main' || data_source === 'both') {
@@ -20,7 +49,7 @@ exports.trainModel = async (req, res) => {
         where: { kategori_gizi: { [Op.not]: null } },
         raw: true,
       });
-      mainRecords = rows.map(r => ({ ...r, _source: 'main' }));
+      mainRecords = rows.map((r) => ({ ...r, _source: 'main' }));
     }
 
     if (data_source === 'dummy' || data_source === 'both') {
@@ -28,7 +57,7 @@ exports.trainModel = async (req, res) => {
         attributes: ['umur_bulan', 'berat_badan', 'tinggi_badan', 'kategori_gizi'],
         raw: true,
       });
-      dummyRecords = rows.map(r => ({ ...r, _source: 'dummy' }));
+      dummyRecords = rows.map((r) => ({ ...r, _source: 'dummy' }));
     }
 
     const allRecords = [...mainRecords, ...dummyRecords];
@@ -39,21 +68,30 @@ exports.trainModel = async (req, res) => {
       });
     }
 
-    // Train the model
-    const modelData = nbService.trainModel(allRecords);
-    modelData.data_source = data_source;
-    modelData.mainCount = mainRecords.length;
-    modelData.dummyCount = dummyRecords.length;
+    // Enrich with Z-scores (required by Gaussian NB)
+    const enriched = enrichWithZScores(allRecords);
+
+    if (enriched.length === 0) {
+      return res.status(400).json({
+        message: 'Semua record gagal dihitung Z-score-nya. Periksa data WHO pair.',
+      });
+    }
+
+    // Train
+    const modelData = nbService.trainModel(enriched);
+    modelData.data_source  = data_source;
+    modelData.mainCount    = mainRecords.length;
+    modelData.dummyCount   = dummyRecords.length;
 
     const sourceLabel = { main: 'Data Utama', dummy: 'Dummy', both: 'Gabungan' }[data_source] || data_source;
 
     // Persist to DB
     const saved = await NaiveBayesModel.create({
-      nama_model: nama_model || `Model NB (${sourceLabel}) - ${new Date().toLocaleDateString('id-ID')}`,
-      model_json: modelData,
-      jumlah_data: modelData.totalRecords,
+      nama_model:   nama_model || `Model GNB (${sourceLabel}) - ${new Date().toLocaleDateString('id-ID')}`,
+      model_json:   modelData,
+      jumlah_data:  modelData.totalRecords,
       jumlah_kelas: modelData.activeClasses.length,
-      akurasi: modelData.accuracy,
+      akurasi:      modelData.accuracy,
     });
 
     res.status(201).json({
@@ -67,7 +105,7 @@ exports.trainModel = async (req, res) => {
   }
 };
 
-// ─── List Models ─────────────────────────────────────────────────────────────
+// ─── List Models ──────────────────────────────────────────────────────────────
 
 exports.getModels = async (req, res) => {
   try {
@@ -81,21 +119,22 @@ exports.getModels = async (req, res) => {
   }
 };
 
-// ─── Get Latest Model ────────────────────────────────────────────────────────
+// ─── Get Latest Model ─────────────────────────────────────────────────────────
 
 exports.getLatestModel = async (req, res) => {
   try {
-    const model = await NaiveBayesModel.findOne({
-      order: [['created_at', 'DESC']],
-    });
-    if (!model) return res.status(404).json({ message: 'Belum ada model yang disimpan. Latih model terlebih dahulu.' });
+    const model = await NaiveBayesModel.findOne({ order: [['created_at', 'DESC']] });
+    if (!model)
+      return res.status(404).json({
+        message: 'Belum ada model yang disimpan. Latih model terlebih dahulu.',
+      });
     res.json(model);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// ─── Get Single Model ────────────────────────────────────────────────────────
+// ─── Get Single Model ─────────────────────────────────────────────────────────
 
 exports.getModelById = async (req, res) => {
   try {
@@ -114,7 +153,9 @@ exports.predict = async (req, res) => {
     const { umur_bulan, berat_badan, tinggi_badan, model_id } = req.body;
 
     if (umur_bulan == null || berat_badan == null || tinggi_badan == null) {
-      return res.status(400).json({ message: 'umur_bulan, berat_badan, dan tinggi_badan diperlukan.' });
+      return res.status(400).json({
+        message: 'umur_bulan, berat_badan, dan tinggi_badan diperlukan.',
+      });
     }
 
     // Load model
@@ -125,16 +166,34 @@ exports.predict = async (req, res) => {
       savedModel = await NaiveBayesModel.findOne({ order: [['created_at', 'DESC']] });
     }
     if (!savedModel) {
-      return res.status(404).json({ message: 'Belum ada model yang tersimpan. Latih model terlebih dahulu.' });
+      return res.status(404).json({
+        message: 'Belum ada model yang tersimpan. Latih model terlebih dahulu.',
+      });
     }
 
+    // Compute Z-scores from raw inputs
+    const bb   = parseFloat(berat_badan);
+    const tb   = parseFloat(tinggi_badan);
+    const umur = parseInt(umur_bulan);
+
+    const assessment = nutritionalStatusService.assess(bb, tb, umur);
+    const z_bbu  = assessment.indices.bbu.z;
+    const z_tbu  = assessment.indices.tbu.z;
+    const z_bbtb = assessment.indices.bbtb.z;
+
     const modelData = savedModel.model_json;
-    const result = nbService.predictFromModel(modelData, parseFloat(umur_bulan), parseFloat(berat_badan), parseFloat(tinggi_badan));
+    const result = nbService.predictFromModel(modelData, z_bbu, z_tbu, z_bbtb);
 
     res.json({
-      model_id: savedModel.id,
+      model_id:   savedModel.id,
       model_name: savedModel.nama_model,
-      input: { umur_bulan, berat_badan, tinggi_badan },
+      input: { umur_bulan: umur, berat_badan: bb, tinggi_badan: tb },
+      zscores: {
+        z_bbu:  parseFloat(z_bbu.toFixed(3)),
+        z_tbu:  parseFloat(z_tbu.toFixed(3)),
+        z_bbtb: parseFloat(z_bbtb.toFixed(3)),
+      },
+      who_assessment: assessment,
       ...result,
     });
   } catch (error) {
@@ -160,8 +219,8 @@ exports.deleteModel = async (req, res) => {
 
 exports.getTrainingData = async (req, res) => {
   try {
-    const { Op } = require('sequelize');
-    const Balita = require('../models/Balita');
+    const { Op }   = require('sequelize');
+    const Balita   = require('../models/Balita');
 
     const records = await Pemeriksaan.findAll({
       attributes: ['id', 'umur_bulan', 'berat_badan', 'tinggi_badan', 'kategori_gizi', 'tanggal_pemeriksaan'],
@@ -173,19 +232,37 @@ exports.getTrainingData = async (req, res) => {
 
     const dummyCount = await DummyData.count();
 
-    // Binned preview
-    const binned = records.map(r => ({
-      id: r.id,
-      nama: r.balita?.nama,
-      umur_bulan: r.umur_bulan,
-      berat_badan: r.berat_badan,
-      tinggi_badan: r.tinggi_badan,
-      kategori_gizi: r.kategori_gizi,
-      tanggal_pemeriksaan: r.tanggal_pemeriksaan,
-      binned: nbService.binRecord(r),
-    }));
+    // Include Z-scores in preview
+    const preview = records.map((r) => {
+      let zscores = null;
+      try {
+        const assessment = nutritionalStatusService.assess(
+          r.berat_badan,
+          r.tinggi_badan,
+          r.umur_bulan
+        );
+        zscores = {
+          z_bbu:  parseFloat(assessment.indices.bbu.z.toFixed(3)),
+          z_tbu:  parseFloat(assessment.indices.tbu.z.toFixed(3)),
+          z_bbtb: parseFloat(assessment.indices.bbtb.z.toFixed(3)),
+        };
+      } catch {
+        zscores = null;
+      }
 
-    res.json({ total: records.length, dummyTotal: dummyCount, records: binned });
+      return {
+        id:                   r.id,
+        nama:                 r.balita?.nama,
+        umur_bulan:           r.umur_bulan,
+        berat_badan:          r.berat_badan,
+        tinggi_badan:         r.tinggi_badan,
+        kategori_gizi:        r.kategori_gizi,
+        tanggal_pemeriksaan:  r.tanggal_pemeriksaan,
+        zscores,
+      };
+    });
+
+    res.json({ total: records.length, dummyTotal: dummyCount, records: preview });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
