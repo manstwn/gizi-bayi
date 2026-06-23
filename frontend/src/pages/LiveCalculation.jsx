@@ -141,21 +141,21 @@ const LiveCalculation = () => {
               <div className="space-y-4">
                 <div className="flex justify-between items-start">
                   <div className="flex flex-col">
-                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Berat Badan (kg)</label>
-                    <span className="text-3xl font-black text-slate-800 leading-none">{inputs.bb.toFixed(1)}</span>
-                  </div>
-                  <div className="text-right flex flex-col items-end">
-                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Ideal (WHO)</p>
-                    <div className="flex items-center space-x-2 mt-1">
+                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-2">Ideal (WHO)</p>
+                    <div className="flex items-center space-x-2">
+                      <p className="text-lg font-black text-emerald-500 leading-none">{result?.indices?.bbu?.ref?.median?.toFixed(1) || '--'}</p>
                       {result?.indices?.bbu?.ref?.median && (
                         <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                          inputs.bb >= result.indices.bbu.ref.median ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                          Math.abs(inputs.bb - result.indices.bbu.ref.median) <= 1 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
                         }`}>
                           {(inputs.bb - result.indices.bbu.ref.median) >= 0 ? '+' : ''}{(inputs.bb - result.indices.bbu.ref.median).toFixed(1)}
                         </span>
                       )}
-                      <p className="text-lg font-black text-emerald-500 leading-none">{result?.indices?.bbu?.ref?.median?.toFixed(1) || '--'}</p>
                     </div>
+                  </div>
+                  <div className="text-right flex flex-col items-end">
+                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Berat Badan (kg)</label>
+                    <span className="text-3xl font-black text-slate-800 leading-none">{inputs.bb.toFixed(1)}</span>
                   </div>
                 </div>
                 <div className="relative pt-2">
@@ -181,21 +181,21 @@ const LiveCalculation = () => {
               <div className="space-y-4">
                 <div className="flex justify-between items-start">
                   <div className="flex flex-col">
-                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Tinggi Badan (cm)</label>
-                    <span className="text-3xl font-black text-slate-800 leading-none">{inputs.tb.toFixed(1)}</span>
-                  </div>
-                  <div className="text-right flex flex-col items-end">
-                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Ideal (WHO)</p>
-                    <div className="flex items-center space-x-2 mt-1">
+                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-2">Ideal (WHO)</p>
+                    <div className="flex items-center space-x-2">
+                      <p className="text-lg font-black text-emerald-500 leading-none">{result?.indices?.tbu?.ref?.median?.toFixed(1) || '--'}</p>
                       {result?.indices?.tbu?.ref?.median && (
                         <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                          inputs.tb >= result.indices.tbu.ref.median ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                          Math.abs(inputs.tb - result.indices.tbu.ref.median) <= 1 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
                         }`}>
                           {(inputs.tb - result.indices.tbu.ref.median) >= 0 ? '+' : ''}{(inputs.tb - result.indices.tbu.ref.median).toFixed(1)}
                         </span>
                       )}
-                      <p className="text-lg font-black text-emerald-500 leading-none">{result?.indices?.tbu?.ref?.median?.toFixed(1) || '--'}</p>
                     </div>
+                  </div>
+                  <div className="text-right flex flex-col items-end">
+                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Tinggi Badan (cm)</label>
+                    <span className="text-3xl font-black text-slate-800 leading-none">{inputs.tb.toFixed(1)}</span>
                   </div>
                 </div>
                 <div className="relative pt-2">
@@ -223,25 +223,25 @@ const LiveCalculation = () => {
 
         {/* Right: Indices Visualizations */}
         <div className="lg:col-span-8 space-y-6">
-          {result && (
+          {result && result.indices ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <ZScoreGauge 
                 title="Weight-for-Age" 
                 label="Berat Badan menurut Umur" 
-                value={result.indices.bbu.z} 
-                category={result.indices.bbu.category} 
+                value={result.indices.bbu?.z ?? 0} 
+                category={result.indices.bbu?.category ?? 'Calculating...'} 
               />
               <ZScoreGauge 
                 title="Height-for-Age" 
                 label="Tinggi Badan menurut Umur" 
-                value={result.indices.tbu.z} 
-                category={result.indices.tbu.category} 
+                value={result.indices.tbu?.z ?? 0} 
+                category={result.indices.tbu?.category ?? 'Calculating...'} 
               />
               <ZScoreGauge 
                 title="Weight-for-Height" 
                 label="Berat Badan menurut Tinggi Badan" 
-                value={result.indices.bbtb.z} 
-                category={result.indices.bbtb.category} 
+                value={result.indices.bbtb?.z ?? 0} 
+                category={result.indices.bbtb?.category ?? 'Calculating...'} 
               />
               
               <div className="bg-slate-900 rounded-[2rem] p-6 text-white flex flex-col justify-center space-y-4 shadow-xl border border-white/5">
@@ -253,26 +253,31 @@ const LiveCalculation = () => {
                 <div className="space-y-4">
                   <div className="p-5 bg-white/5 rounded-3xl border border-white/10">
                     <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Status Gizi (BB/TB)</p>
-                    <p className="text-lg font-black text-emerald-400 leading-tight">{result.indices.bbtb.category}</p>
+                    <p className="text-lg font-black text-emerald-400 leading-tight">{result.indices.bbtb?.category ?? '--'}</p>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4">
-                    <div className={`p-4 rounded-3xl border ${result.summary.stunting === 'Normal' ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
+                    <div className={`p-4 rounded-3xl border ${result.summary?.stunting === 'Normal' ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
                       <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">Stunting</p>
-                      <p className="text-xs font-black">{result.summary.stunting}</p>
+                      <p className="text-xs font-black">{result.summary?.stunting ?? '--'}</p>
                     </div>
-                    <div className={`p-4 rounded-3xl border ${result.summary.underweight === 'Normal' ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
+                    <div className={`p-4 rounded-3xl border ${result.summary?.underweight === 'Normal' ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
                       <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">Underweight</p>
-                      <p className="text-xs font-black">{result.summary.underweight}</p>
+                      <p className="text-xs font-black">{result.summary?.underweight ?? '--'}</p>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-64 bg-white rounded-[2rem] border border-dashed border-slate-200">
+              <RefreshCw className="animate-spin text-medical-200 mb-4" size={32} />
+              <p className="text-slate-400 font-bold text-sm uppercase tracking-widest">Waiting for simulation data...</p>
+            </div>
           )}
 
           {/* Reference Details Table */}
-          {result && (
+          {result && result.indices && (
             <div className="bg-white rounded-[2rem] p-6 border border-slate-200 shadow-sm overflow-hidden">
               <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center">
                 <span className="bg-slate-900 text-white w-6 h-6 rounded-full flex items-center justify-center text-[10px] mr-3">i</span>
@@ -293,24 +298,24 @@ const LiveCalculation = () => {
                   <tbody className="divide-y divide-slate-50">
                     <tr>
                       <td className="py-4 font-bold text-slate-700 text-xs">Berat Badan menurut Umur</td>
-                      <td className="py-4 text-xs font-medium">{result.indices.bbu.ref.minus3SD.toFixed(2)}</td>
-                      <td className="py-4 text-xs font-medium">{result.indices.bbu.ref.minus2SD.toFixed(2)}</td>
-                      <td className="py-4 text-xs font-bold text-emerald-600">{result.indices.bbu.ref.median.toFixed(2)}</td>
-                      <td className="py-4 text-xs font-medium">{result.indices.bbu.ref.plus2SD.toFixed(2)}</td>
+                      <td className="py-4 text-xs font-medium">{result.indices.bbu?.ref?.minus3SD?.toFixed(2) ?? '--'}</td>
+                      <td className="py-4 text-xs font-medium">{result.indices.bbu?.ref?.minus2SD?.toFixed(2) ?? '--'}</td>
+                      <td className="py-4 text-xs font-bold text-emerald-600">{result.indices.bbu?.ref?.median?.toFixed(2) ?? '--'}</td>
+                      <td className="py-4 text-xs font-medium">{result.indices.bbu?.ref?.plus2SD?.toFixed(2) ?? '--'}</td>
                     </tr>
                     <tr>
                       <td className="py-4 font-bold text-slate-700 text-xs">Tinggi Badan menurut Umur</td>
-                      <td className="py-4 text-xs font-medium">{result.indices.tbu.ref.minus3SD.toFixed(2)}</td>
-                      <td className="py-4 text-xs font-medium">{result.indices.tbu.ref.minus2SD.toFixed(2)}</td>
-                      <td className="py-4 text-xs font-bold text-emerald-600">{result.indices.tbu.ref.median.toFixed(2)}</td>
-                      <td className="py-4 text-xs font-medium">{result.indices.tbu.ref.plus2SD.toFixed(2)}</td>
+                      <td className="py-4 text-xs font-medium">{result.indices.tbu?.ref?.minus3SD?.toFixed(2) ?? '--'}</td>
+                      <td className="py-4 text-xs font-medium">{result.indices.tbu?.ref?.minus2SD?.toFixed(2) ?? '--'}</td>
+                      <td className="py-4 text-xs font-bold text-emerald-600">{result.indices.tbu?.ref?.median?.toFixed(2) ?? '--'}</td>
+                      <td className="py-4 text-xs font-medium">{result.indices.tbu?.ref?.plus2SD?.toFixed(2) ?? '--'}</td>
                     </tr>
                     <tr>
                       <td className="py-4 font-bold text-slate-700 text-xs">Berat Badan menurut Tinggi Badan</td>
-                      <td className="py-4 text-xs font-medium">{result.indices.bbtb.ref.minus3SD.toFixed(2)}</td>
-                      <td className="py-4 text-xs font-medium">{result.indices.bbtb.ref.minus2SD.toFixed(2)}</td>
-                      <td className="py-4 text-xs font-bold text-emerald-600">{result.indices.bbtb.ref.median.toFixed(2)}</td>
-                      <td className="py-4 text-xs font-medium">{result.indices.bbtb.ref.plus2SD.toFixed(2)}</td>
+                      <td className="py-4 text-xs font-medium">{result.indices.bbtb?.ref?.minus3SD?.toFixed(2) ?? '--'}</td>
+                      <td className="py-4 text-xs font-medium">{result.indices.bbtb?.ref?.minus2SD?.toFixed(2) ?? '--'}</td>
+                      <td className="py-4 text-xs font-bold text-emerald-600">{result.indices.bbtb?.ref?.median?.toFixed(2) ?? '--'}</td>
+                      <td className="py-4 text-xs font-medium">{result.indices.bbtb?.ref?.plus2SD?.toFixed(2) ?? '--'}</td>
                     </tr>
                   </tbody>
                 </table>

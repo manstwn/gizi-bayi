@@ -14,7 +14,10 @@ import {
   Heart,
   Settings,
   Cpu,
-  FileBarChart
+  FileBarChart,
+  Brain,
+  Sparkles,
+  FlaskConical
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 
@@ -30,6 +33,12 @@ const MainLayout = ({ children }) => {
     { name: 'Pemeriksaan', href: '/pemeriksaan', icon: ClipboardList },
     { name: 'Laporan', href: '/laporan', icon: FileBarChart },
     { name: 'Simulasi Perhitungan', href: '/simulation', icon: Cpu },
+  ];
+
+  const navNaiveBayes = [
+    { name: 'NB — Training', href: '/naive-bayes/train', icon: Brain },
+    { name: 'NB — Prediksi', href: '/naive-bayes/predict', icon: Sparkles },
+    { name: 'NB — Data Dummy', href: '/naive-bayes/dummy', icon: FlaskConical },
   ];
 
   if (user?.role === 'admin' || user?.role === 'kader') {
@@ -108,6 +117,26 @@ const MainLayout = ({ children }) => {
               </Link>
             );
           })}
+
+          <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-4 mb-2">Naive Bayes</p>
+          {navNaiveBayes.map((item) => {
+            const isActive = location.pathname === item.href;
+            return (
+              <Link
+                key={item.name}
+                to={item.href}
+                className={cn(
+                  "flex items-center space-x-3 p-3 rounded-xl transition-all group",
+                  isActive 
+                    ? "bg-violet-50 text-violet-600 shadow-sm border border-violet-100/50" 
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                )}
+              >
+                <item.icon size={20} className={cn("transition-transform group-hover:scale-110", isActive ? "text-violet-600" : "text-slate-400")} />
+                <span className="font-semibold text-sm">{item.name}</span>
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="p-4 border-t border-slate-50 mt-auto">
@@ -145,7 +174,7 @@ const MainLayout = ({ children }) => {
       <div className="flex-1 flex flex-col min-w-0 md:ml-72">
         <header className="hidden md:flex bg-white/80 backdrop-blur-md border-b border-slate-200 h-16 items-center px-8 sticky top-0 z-30">
           <h2 className="text-xl font-bold text-slate-800">
-            {navigation.find(n => n.href === location.pathname)?.name || 'Detail'}
+            {[...navigation, ...navNaiveBayes].find(n => n.href === location.pathname)?.name || 'Detail'}
           </h2>
           <div className="ml-auto flex items-center space-x-4">
              {/* Search or other top actions can go here */}

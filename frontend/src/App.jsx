@@ -11,6 +11,9 @@ import ProfilePage from './pages/ProfilePage';
 import LiveCalculation from './pages/LiveCalculation';
 import SettingsPage from './pages/SettingsPage';
 import MainLayout from './components/MainLayout';
+import NaiveBayesTrain from './pages/NaiveBayesTrain';
+import NaiveBayesPredict from './pages/NaiveBayesPredict';
+import DummyDataPage from './pages/DummyDataPage';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -100,6 +103,33 @@ function App() {
           element={
             <ProtectedRoute>
               <SettingsPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path="/naive-bayes/train" 
+          element={
+            <ProtectedRoute>
+              <NaiveBayesTrain />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path="/naive-bayes/predict" 
+          element={
+            <ProtectedRoute>
+              <NaiveBayesPredict />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path="/naive-bayes/dummy" 
+          element={
+            <ProtectedRoute>
+              <DummyDataPage />
             </ProtectedRoute>
           } 
         />

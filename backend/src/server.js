@@ -1,6 +1,8 @@
 const app = require('./app');
 const sequelize = require('./config/database');
 const User = require('./models/User');
+const NaiveBayesModel = require('./models/NaiveBayesModel');
+const DummyData = require('./models/DummyData');
 require('dotenv').config();
 
 const PORT = process.env.PORT || 5000;
