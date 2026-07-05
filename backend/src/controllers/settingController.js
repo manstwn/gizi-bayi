@@ -36,7 +36,7 @@ exports.updateFuzzyParameters = async (req, res) => {
 
 exports.simulateCalculation = async (req, res) => {
   try {
-    const { bb, tb, umur } = req.body;
+    const { bb, tb, umur, gender } = req.body;
     
     if (!bb || !tb || umur === undefined) {
       return res.status(400).json({ message: 'Missing required inputs (bb, tb, umur)' });
@@ -45,7 +45,8 @@ exports.simulateCalculation = async (req, res) => {
     const assessment = NutritionalStatusService.assess(
       parseFloat(bb), 
       parseFloat(tb), 
-      parseFloat(umur)
+      parseFloat(umur),
+      gender
     );
 
     res.json(assessment);

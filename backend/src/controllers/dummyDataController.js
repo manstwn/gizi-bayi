@@ -111,12 +111,14 @@ function generateOneRecord(targetLabel, batchLabel, maxRetries = 10) {
     ? (CLASS_Z_PROFILES.find((p) => p.label === targetLabel) || pickWeighted(CLASS_Z_PROFILES))
     : pickWeighted(CLASS_Z_PROFILES);
 
+  const gender = Math.random() < 0.5 ? 'L' : 'P';
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     // 1. Random age 0–60 months
     const umur_bulan = Math.floor(Math.random() * 61);
 
     // 2. WHO SD references
-    const refTBU  = pairDataService.getSDValues('umur-tinggi', umur_bulan);
+    const refTBU  = pairDataService.getSDValues(gender, 'umur-tinggi', umur_bulan);
     if (!refTBU) continue;
 
     // 3. Sample Z-scores
@@ -128,14 +130,14 @@ function generateOneRecord(targetLabel, batchLabel, maxRetries = 10) {
     if (!tb || tb < 45 || tb > 130) continue;
 
     // 5. BB/TB reference → back-calculate BB
-    const refBBTB = pairDataService.getSDValues('panjang-berat', tb);
+    const refBBTB = pairDataService.getSDValues(gender, umur_bulan < 24 ? 'panjang-berat' : 'tinggi-berat', tb);
     if (!refBBTB) continue;
 
     const bb = backCalcFromZ(zBBTB, refBBTB);
     if (!bb || bb < 1.5 || bb > 40) continue;
 
     // 6. Real assessment → canonical label
-    const assessment = nutritionalStatusService.assess(bb, tb, umur_bulan);
+    const assessment = nutritionalStatusService.assess(bb, tb, umur_bulan, gender);
     const rawLabel   = assessment.summary.status;
     const kategori_gizi = normalizeClass(rawLabel);
 
@@ -143,6 +145,7 @@ function generateOneRecord(targetLabel, batchLabel, maxRetries = 10) {
       umur_bulan,
       berat_badan:   bb,
       tinggi_badan:  tb,
+      jenis_kelamin: gender,
       kategori_gizi,
       label: batchLabel || 'auto-generated',
     };
@@ -152,26 +155,28 @@ function generateOneRecord(targetLabel, batchLabel, maxRetries = 10) {
   // (NOT the median, to keep class distribution varied)
   const fallbackProfile = pickWeighted(CLASS_Z_PROFILES);
   const umur_bulan = Math.floor(Math.random() * 61);
-  const refTBU  = pairDataService.getSDValues('umur-tinggi', umur_bulan);
+  const refTBU  = pairDataService.getSDValues(gender, 'umur-tinggi', umur_bulan);
   const refBBTB_check = refTBU
-    ? pairDataService.getSDValues('panjang-berat', refTBU.median)
+    ? pairDataService.getSDValues(gender, umur_bulan < 24 ? 'panjang-berat' : 'tinggi-berat', refTBU.median)
     : null;
 
   if (refTBU && refBBTB_check) {
     const zBBTB = randFloat(fallbackProfile.zBBTB[0], fallbackProfile.zBBTB[1]);
     const zTBU  = randFloat(fallbackProfile.zTBU[0],  fallbackProfile.zTBU[1]);
     const tb = backCalcFromZ(zTBU, refTBU) || refTBU.median;
-    const refBBTB2 = pairDataService.getSDValues('panjang-berat', tb) || refBBTB_check;
+    const refBBTB2 = pairDataService.getSDValues(gender, umur_bulan < 24 ? 'panjang-berat' : 'tinggi-berat', tb) || refBBTB_check;
     const bb = backCalcFromZ(zBBTB, refBBTB2) || refBBTB_check.median;
     const assessment = nutritionalStatusService.assess(
       Math.max(1.5, Math.min(bb, 40)),
       Math.max(45,  Math.min(tb, 130)),
-      umur_bulan
+      umur_bulan,
+      gender
     );
     return {
       umur_bulan,
       berat_badan:  parseFloat(Math.max(1.5, Math.min(bb, 40)).toFixed(1)),
       tinggi_badan: parseFloat(Math.max(45,  Math.min(tb, 130)).toFixed(1)),
+      jenis_kelamin: gender,
       kategori_gizi: normalizeClass(assessment.summary.status),
       label: batchLabel || 'auto-generated',
     };
@@ -182,6 +187,7 @@ function generateOneRecord(targetLabel, batchLabel, maxRetries = 10) {
     umur_bulan: 24,
     berat_badan: 11.0,
     tinggi_badan: 85.0,
+    jenis_kelamin: gender,
     kategori_gizi: 'Gizi Baik',
     label: batchLabel || 'auto-generated',
   };
@@ -248,6 +254,7 @@ exports.importCustom = async (req, res) => {
       const bb   = parseFloat(r.berat_badan ?? r.bb);
       const tb   = parseFloat(r.tinggi_badan ?? r.tb);
       const cls  = r.kategori_gizi ?? r.kelas ?? r.label_kelas;
+      const jkel = r.jenis_kelamin ?? r.jk ?? r.gender ?? 'L';
 
       if (isNaN(umur) || isNaN(bb) || isNaN(tb) || !cls) {
         errors.push(
@@ -256,11 +263,13 @@ exports.importCustom = async (req, res) => {
         return;
       }
 
+      const normalizedJk = (jkel.toUpperCase().startsWith('P') || jkel.toUpperCase().includes('PEREMPUAN')) ? 'P' : 'L';
       const normalizedCls = normalizeClass(cls);
       toInsert.push({
         umur_bulan:    umur,
         berat_badan:   bb,
         tinggi_badan:  tb,
+        jenis_kelamin: normalizedJk,
         kategori_gizi: normalizedCls,
         label: batchLabel,
       });

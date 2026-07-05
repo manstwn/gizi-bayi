@@ -7,7 +7,8 @@ const LiveCalculation = () => {
   const [inputs, setInputs] = useState({
     bb: 10.3,
     tb: 79,
-    umur: 15
+    umur: 15,
+    gender: 'L'
   });
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -44,7 +45,7 @@ const LiveCalculation = () => {
     const diffMonth = (today.getFullYear() - birthDate.getFullYear()) * 12 + (today.getMonth() - birthDate.getMonth());
     const umur = diffMonth >= 0 ? diffMonth : 0;
 
-    setInputs(prev => ({ ...prev, umur }));
+    setInputs(prev => ({ ...prev, umur, gender: item.jenis_kelamin }));
     setIsAgeLocked(true);
     setSearch('');
     setBalitaList([]);
@@ -247,6 +248,41 @@ const LiveCalculation = () => {
               Input Pengukuran
             </h3>
             <div className="space-y-6">
+              {/* Gender Selector */}
+              <div className="space-y-2">
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Jenis Kelamin</label>
+                <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+                  <button
+                    type="button"
+                    disabled={isAgeLocked}
+                    onClick={() => setInputs({ ...inputs, gender: 'L' })}
+                    className={cn(
+                      "flex-1 py-2.5 rounded-xl text-xs font-black tracking-wider transition-all",
+                      isAgeLocked && inputs.gender !== 'L' ? "text-slate-300 cursor-not-allowed opacity-50" : "",
+                      inputs.gender === 'L' 
+                        ? 'bg-slate-900 text-white shadow-md' 
+                        : 'text-slate-500 hover:text-slate-800'
+                    )}
+                  >
+                    LAKI-LAKI
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isAgeLocked}
+                    onClick={() => setInputs({ ...inputs, gender: 'P' })}
+                    className={cn(
+                      "flex-1 py-2.5 rounded-xl text-xs font-black tracking-wider transition-all",
+                      isAgeLocked && inputs.gender !== 'P' ? "text-slate-300 cursor-not-allowed opacity-50" : "",
+                      inputs.gender === 'P' 
+                        ? 'bg-slate-900 text-white shadow-md' 
+                        : 'text-slate-500 hover:text-slate-800'
+                    )}
+                  >
+                    PEREMPUAN
+                  </button>
+                </div>
+              </div>
+
               {/* Umur Slider */}
               <div className="space-y-4">
                 <div className="flex justify-between items-end">
@@ -339,7 +375,12 @@ const LiveCalculation = () => {
                     </div>
                   </div>
                   <div className="text-right flex flex-col items-end">
-                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Tinggi Badan (cm)</label>
+                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">
+                      {inputs.umur < 24 ? 'Panjang Badan (cm)' : 'Tinggi Badan (cm)'}
+                    </label>
+                    <span className="text-[9px] text-slate-400 font-bold mb-1">
+                      *{inputs.umur < 24 ? '0-23 Bulan - Panjang' : '24-60 Bulan - Tinggi'}
+                    </span>
                     <span className="text-3xl font-black text-slate-800 leading-none">{inputs.tb.toFixed(1)}</span>
                   </div>
                 </div>
@@ -414,7 +455,10 @@ const LiveCalculation = () => {
                       </td>
                     </tr>
                     <tr>
-                      <td className="py-4 font-bold text-slate-700 text-xs">Berat Badan menurut Tinggi Badan (BB/TB)</td>
+                      <td className="py-4 font-bold text-slate-700 text-xs">
+                        <div>Berat Badan menurut {inputs.umur < 24 ? 'Panjang' : 'Tinggi'} Badan</div>
+                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">*{inputs.umur < 24 ? 'BB/PB - 0-23 Bulan' : 'BB/TB - 24-60 Bulan'}</div>
+                      </td>
                       <td className="py-4 text-xs font-mono font-black text-slate-800">
                         {result.indices.bbtb?.z ? (result.indices.bbtb.z >= 0 ? '+' : '') + result.indices.bbtb.z.toFixed(2).replace('.', ',') : '0,00'}
                       </td>
@@ -434,7 +478,7 @@ const LiveCalculation = () => {
               {/* Ringkasan Kesimpulan */}
               <div className="bg-slate-900 rounded-3xl p-5 text-white grid grid-cols-3 gap-4 border border-white/5">
                 <div className="text-center">
-                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Status Gizi (BB/TB)</p>
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Status Gizi ({inputs.umur < 24 ? 'BB/PB - 0-23 Bulan' : 'BB/TB - 24-60 Bulan'})</p>
                   <p className="text-xs font-black text-emerald-400 truncate">{result.indices.bbtb?.category || '--'}</p>
                 </div>
                 <div className="text-center border-x border-white/10">
@@ -503,7 +547,10 @@ const LiveCalculation = () => {
                     </tr>
                     {renderSDRangeBar(inputs.tb, result.indices.tbu?.ref)}
                     <tr>
-                      <td className="py-4 font-bold text-slate-700 text-xs">Berat Badan menurut Tinggi Badan ({inputs.tb.toFixed(1).replace('.', ',')} cm)</td>
+                      <td className="py-4 font-bold text-slate-700 text-xs">
+                        <div>Berat Badan menurut {inputs.umur < 24 ? 'Panjang' : 'Tinggi'} Badan ({inputs.tb.toFixed(1).replace('.', ',')} cm)</div>
+                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">*{inputs.umur < 24 ? 'BB/PB - 0-23 Bulan' : 'BB/TB - 24-60 Bulan'}</div>
+                      </td>
                       <td className="py-4 text-xs font-black text-indigo-600">{inputs.bb.toFixed(1).replace('.', ',')} Kg</td>
                       <td className="py-4 text-xs font-medium">{formatIndoVal(result.indices.bbtb?.ref?.minus3SD, 'Kg')}</td>
                       <td className="py-4 text-xs font-medium">{formatIndoVal(result.indices.bbtb?.ref?.minus2SD, 'Kg')}</td>

@@ -400,7 +400,10 @@ const Laporan = () => {
                                           </td>
                                         </tr>
                                         <tr>
-                                          <td className="py-3 font-medium text-slate-600">Berat Badan menurut Tinggi Badan (BB/TB)</td>
+                                          <td className="py-3 font-medium text-slate-600">
+                                            <div>Berat Badan menurut {item.umur_bulan < 24 ? 'Panjang' : 'Tinggi'} Badan</div>
+                                            <div className="text-[10px] text-slate-400 font-normal mt-0.5">*{item.umur_bulan < 24 ? 'BB/PB - 0-23 Bulan' : 'BB/TB - 24-60 Bulan'}</div>
+                                          </td>
                                           <td className="py-3 font-mono font-bold text-slate-800">
                                             {expandedDetails.indices.bbtb?.z ? (expandedDetails.indices.bbtb.z >= 0 ? '+' : '') + expandedDetails.indices.bbtb.z.toFixed(2).replace('.', ',') : '0,00'}
                                           </td>
@@ -419,7 +422,7 @@ const Laporan = () => {
                                   
                                   <div className="bg-slate-900 rounded-2xl p-4 text-white grid grid-cols-3 gap-2 text-center text-[10px]">
                                     <div>
-                                      <p className="text-[7px] text-slate-400 uppercase font-bold mb-0.5">Status Gizi (BB/TB)</p>
+                                      <p className="text-[7px] text-slate-400 uppercase font-bold mb-0.5">Status Gizi ({item.umur_bulan < 24 ? 'BB/PB - 0-23 Bulan' : 'BB/TB - 24-60 Bulan'})</p>
                                       <p className="font-black text-emerald-400 truncate">{expandedDetails.indices.bbtb?.category || '--'}</p>
                                     </div>
                                     <div className="border-x border-white/10">
@@ -481,7 +484,10 @@ const Laporan = () => {
                                         </tr>
                                         {renderSDRangeBar(item.tinggi_badan, expandedDetails.indices.tbu?.ref)}
                                         <tr>
-                                          <td className="py-3 font-bold text-slate-700">Berat Badan menurut Tinggi Badan ({item.tinggi_badan.toFixed(1).replace('.', ',')} cm)</td>
+                                          <td className="py-3 font-bold text-slate-700">
+                                            <div>Berat Badan menurut {item.umur_bulan < 24 ? 'Panjang' : 'Tinggi'} Badan ({item.tinggi_badan.toFixed(1).replace('.', ',')} cm)</div>
+                                            <div className="text-[9px] text-slate-400 font-normal mt-0.5">*{item.umur_bulan < 24 ? 'BB/PB - 0-23 Bulan' : 'BB/TB - 24-60 Bulan'}</div>
+                                          </td>
                                           <td className="py-3 font-black text-indigo-600">{item.berat_badan.toFixed(1).replace('.', ',')} Kg</td>
                                           <td className="py-3">{formatIndoVal(expandedDetails.indices.bbtb?.ref?.minus3SD, 'Kg')}</td>
                                           <td className="py-3">{formatIndoVal(expandedDetails.indices.bbtb?.ref?.minus2SD, 'Kg')}</td>

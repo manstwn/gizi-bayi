@@ -266,7 +266,7 @@ const NaiveBayesTrain = () => {
   const featureLabels = {
     z_bbu:  'Z-score BB/U',
     z_tbu:  'Z-score TB/U',
-    z_bbtb: 'Z-score BB/TB',
+    z_bbtb: 'Z-score BB/TB atau BB/PB',
   };
 
   return (

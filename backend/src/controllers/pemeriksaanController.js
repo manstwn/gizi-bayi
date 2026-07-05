@@ -16,7 +16,8 @@ exports.createPemeriksaan = async (req, res) => {
     const assessment = NutritionalStatusService.assess(
       parseFloat(berat_badan), 
       parseFloat(tinggi_badan), 
-      parseFloat(umur_bulan)
+      parseFloat(umur_bulan),
+      balita.jenis_kelamin
     );
 
     let finalKategori = assessment.summary.status;

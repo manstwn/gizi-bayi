@@ -9,6 +9,7 @@ router.get('/', balitaController.getAllBalita);
 router.get('/:id', balitaController.getBalitaById);
 router.post('/', balitaController.createBalita);
 router.put('/:id', balitaController.updateBalita);
+router.delete('/all', roleMiddleware(['admin']), balitaController.deleteAllBalita);
 router.delete('/:id', roleMiddleware(['admin']), balitaController.deleteBalita);
 
 module.exports = router;

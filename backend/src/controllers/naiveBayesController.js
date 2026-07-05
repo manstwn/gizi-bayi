@@ -18,7 +18,8 @@ function enrichWithZScores(records) {
       const assessment = nutritionalStatusService.assess(
         parseFloat(r.berat_badan),
         parseFloat(r.tinggi_badan),
-        parseInt(r.umur_bulan)
+        parseInt(r.umur_bulan),
+        r.jenis_kelamin || 'L'
       );
       enriched.push({
         ...r,
@@ -39,6 +40,7 @@ exports.trainModel = async (req, res) => {
   try {
     const { nama_model, data_source = 'main' } = req.body;
     const { Op } = require('sequelize');
+    const Balita = require('../models/Balita');
 
     let mainRecords  = [];
     let dummyRecords = [];
@@ -46,15 +48,22 @@ exports.trainModel = async (req, res) => {
     if (data_source === 'main' || data_source === 'both') {
       const rows = await Pemeriksaan.findAll({
         attributes: ['umur_bulan', 'berat_badan', 'tinggi_badan', 'kategori_gizi'],
+        include: [{ model: Balita, as: 'balita', attributes: ['jenis_kelamin'] }],
         where: { kategori_gizi: { [Op.not]: null } },
-        raw: true,
       });
-      mainRecords = rows.map((r) => ({ ...r, _source: 'main' }));
+      mainRecords = rows.map((r) => ({
+        umur_bulan: r.umur_bulan,
+        berat_badan: r.berat_badan,
+        tinggi_badan: r.tinggi_badan,
+        kategori_gizi: r.kategori_gizi,
+        jenis_kelamin: r.balita?.jenis_kelamin || 'L',
+        _source: 'main'
+      }));
     }
 
     if (data_source === 'dummy' || data_source === 'both') {
       const rows = await DummyData.findAll({
-        attributes: ['umur_bulan', 'berat_badan', 'tinggi_badan', 'kategori_gizi'],
+        attributes: ['umur_bulan', 'berat_badan', 'tinggi_badan', 'kategori_gizi', 'jenis_kelamin'],
         raw: true,
       });
       dummyRecords = rows.map((r) => ({ ...r, _source: 'dummy' }));
@@ -150,7 +159,7 @@ exports.getModelById = async (req, res) => {
 
 exports.predict = async (req, res) => {
   try {
-    const { umur_bulan, berat_badan, tinggi_badan, model_id } = req.body;
+    const { umur_bulan, berat_badan, tinggi_badan, model_id, gender } = req.body;
 
     if (umur_bulan == null || berat_badan == null || tinggi_badan == null) {
       return res.status(400).json({
@@ -176,7 +185,7 @@ exports.predict = async (req, res) => {
     const tb   = parseFloat(tinggi_badan);
     const umur = parseInt(umur_bulan);
 
-    const assessment = nutritionalStatusService.assess(bb, tb, umur);
+    const assessment = nutritionalStatusService.assess(bb, tb, umur, gender);
     const z_bbu  = assessment.indices.bbu.z;
     const z_tbu  = assessment.indices.tbu.z;
     const z_bbtb = assessment.indices.bbtb.z;
@@ -224,7 +233,7 @@ exports.getTrainingData = async (req, res) => {
 
     const records = await Pemeriksaan.findAll({
       attributes: ['id', 'umur_bulan', 'berat_badan', 'tinggi_badan', 'kategori_gizi', 'tanggal_pemeriksaan'],
-      include: [{ model: Balita, as: 'balita', attributes: ['nama'] }],
+      include: [{ model: Balita, as: 'balita', attributes: ['nama', 'jenis_kelamin'] }],
       where: { kategori_gizi: { [Op.not]: null } },
       order: [['tanggal_pemeriksaan', 'DESC']],
       limit: 200,
@@ -239,7 +248,8 @@ exports.getTrainingData = async (req, res) => {
         const assessment = nutritionalStatusService.assess(
           r.berat_badan,
           r.tinggi_badan,
-          r.umur_bulan
+          r.umur_bulan,
+          r.balita?.jenis_kelamin || 'L'
         );
         zscores = {
           z_bbu:  parseFloat(assessment.indices.bbu.z.toFixed(3)),

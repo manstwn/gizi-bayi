@@ -65,3 +65,21 @@ exports.deleteBalita = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+exports.deleteAllBalita = async (req, res) => {
+  try {
+    // Delete all checkups first
+    await Pemeriksaan.destroy({ where: {} });
+    // Then delete all balitas
+    await Balita.destroy({ where: {} });
+    
+    // Reset SQLite sequences
+    const sequelize = require('../config/database');
+    await sequelize.query("DELETE FROM sqlite_sequence WHERE name IN ('Balita', 'Pemeriksaan', 'Balitas', 'Pemeriksans')");
+    
+    res.json({ message: 'Semua data balita dan riwayat pemeriksaan berhasil dihapus secara permanen.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+

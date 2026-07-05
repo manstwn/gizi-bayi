@@ -159,7 +159,7 @@ const FormulaRow = ({ cls, step, isPredicted }) => {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 const NaiveBayesPredict = () => {
-  const [inputs, setInputs] = useState({ umur_bulan: 15, berat_badan: 10.0, tinggi_badan: 79 });
+  const [inputs, setInputs] = useState({ umur_bulan: 15, berat_badan: 10.0, tinggi_badan: 79, gender: 'L' });
   const [result, setResult]   = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
@@ -277,6 +277,30 @@ const NaiveBayesPredict = () => {
             <h3 className="font-black text-slate-900 flex items-center gap-2 text-sm">
               <Activity size={16} className="text-indigo-600" /> Input Pengukuran
             </h3>
+            {/* Gender Selector */}
+            <div className="space-y-2">
+              <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Jenis Kelamin</label>
+              <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setInputs({ ...inputs, gender: 'L' })}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-black tracking-wider transition-all ${
+                    inputs.gender === 'L' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  LAKI-LAKI
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInputs({ ...inputs, gender: 'P' })}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-black tracking-wider transition-all ${
+                    inputs.gender === 'P' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  PEREMPUAN
+                </button>
+              </div>
+            </div>
             <SliderInput label="Umur" unit="bulan" value={inputs.umur_bulan} min={0} max={60} step={1}
               onChange={(v) => setInputs((p) => ({ ...p, umur_bulan: v }))} />
             <SliderInput label="Berat Badan" unit="kg" value={inputs.berat_badan} min={2} max={30} step={0.1}
@@ -373,7 +397,9 @@ const NaiveBayesPredict = () => {
                     <div className="p-4 bg-slate-50 rounded-2xl">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">WHO Z-score Langsung</p>
                       <p className="font-black text-slate-800 text-sm">{result.who_assessment?.summary?.status}</p>
-                      <p className="text-[10px] text-slate-400 mt-1">Berdasarkan Z BB/TB</p>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        Berdasarkan Z {result.input?.umur_bulan < 24 ? 'BB/PB (0-23 Bulan)' : 'BB/TB (24-60 Bulan)'}
+                      </p>
                     </div>
                   </div>
                 </div>

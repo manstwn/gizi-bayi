@@ -33,6 +33,21 @@ const startServer = async () => {
         });
         console.log("Added 'model_id' column to Pemeriksaan table.");
       }
+
+      // Safe migration for dummy_data table
+      try {
+        const dummyTableDefinition = await queryInterface.describeTable(DummyData.tableName);
+        if (!dummyTableDefinition.jenis_kelamin) {
+          await queryInterface.addColumn(DummyData.tableName, 'jenis_kelamin', {
+            type: require('sequelize').DataTypes.STRING,
+            defaultValue: 'L',
+            allowNull: false,
+          });
+          console.log("Added 'jenis_kelamin' column to dummy_data table.");
+        }
+      } catch (dummyMigErr) {
+        console.error('Error running dummy_data custom migration:', dummyMigErr.message);
+      }
     } catch (migErr) {
       console.error('Error running custom migrations:', migErr.message);
     }

@@ -293,7 +293,7 @@ const Dashboard = () => {
                               <span className="text-xs font-black text-slate-700 font-mono" title="Tingkat Keyakinan">{p.hasil_fuzzy.toFixed(1)}%</span>
                             </>
                           ) : (
-                            <span className="text-xs font-black text-slate-700 font-mono" title="Z-Score BB/TB">Z: {p.hasil_fuzzy.toFixed(2)}</span>
+                            <span className="text-xs font-black text-slate-700 font-mono" title={p.umur_bulan < 24 ? "Z-Score BB/PB (0-23 Bulan)" : "Z-Score BB/TB (24-60 Bulan)"}>Z: {p.hasil_fuzzy.toFixed(2)}</span>
                           )}
                        </div>
                     </td>

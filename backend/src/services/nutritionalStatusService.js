@@ -55,17 +55,18 @@ class NutritionalStatusService {
   /**
    * Comprehensive Assessment
    */
-  assess(bb, tb, umur) {
+  assess(bb, tb, umur, gender) {
     // 1. BB/U
-    const refBBU = pairDataService.getSDValues('umur-berat', umur);
+    const refBBU = pairDataService.getSDValues(gender, 'umur-berat', umur);
     const zBBU = this.calculateZScore(bb, refBBU);
     
     // 2. TB/U
-    const refTBU = pairDataService.getSDValues('umur-tinggi', umur);
+    const refTBU = pairDataService.getSDValues(gender, 'umur-tinggi', umur);
     const zTBU = this.calculateZScore(tb, refTBU);
     
     // 3. BB/TB (or BB/PB)
-    const refBBTB = pairDataService.getSDValues('panjang-berat', tb);
+    const type = (umur < 24) ? 'panjang-berat' : 'tinggi-berat';
+    const refBBTB = pairDataService.getSDValues(gender, type, tb);
     const zBBTB = this.calculateZScore(bb, refBBTB);
 
     return {

@@ -16,7 +16,7 @@ const FEATURE_KEYS = ['z_bbu', 'z_tbu', 'z_bbtb'];
 const FEATURE_LABELS = {
   z_bbu:  'Z-score BB/U (Berat Badan per Umur)',
   z_tbu:  'Z-score TB/U (Tinggi Badan per Umur)',
-  z_bbtb: 'Z-score BB/TB (Berat Badan per Tinggi Badan)',
+  z_bbtb: 'Z-score BB/TB atau BB/PB (Berat Badan menurut Tinggi/Panjang)',
 };
 
 // ─── Class Normalisation ─────────────────────────────────────────────────────

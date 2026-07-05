@@ -414,9 +414,12 @@ const Pemeriksaan = () => {
                         </div>
                         
                         {(result.data.metode || 'WHO') === 'WHO' ? (
-                          <div className="flex items-center justify-center space-x-1">
-                             <span className="text-xs font-bold text-slate-400">Z-Score BB/TB:</span>
-                             <span className="text-lg font-black text-slate-800 font-mono">{result.data.hasil_fuzzy.toFixed(2)}</span>
+                          <div className="text-center">
+                            <div className="flex items-center justify-center space-x-1">
+                               <span className="text-xs font-bold text-slate-400">Z-Score {result.data.umur_bulan < 24 ? 'BB/PB' : 'BB/TB'}:</span>
+                               <span className="text-lg font-black text-slate-800 font-mono">{result.data.hasil_fuzzy.toFixed(2)}</span>
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-normal mt-0.5">*{result.data.umur_bulan < 24 ? 'BB/PB - 0-23 Bulan' : 'BB/TB - 24-60 Bulan'}</div>
                           </div>
                         ) : (
                           <div className="flex items-center justify-center space-x-1">
@@ -436,8 +439,11 @@ const Pemeriksaan = () => {
                               <span className="text-slate-500 font-semibold">TB/U (Tinggi/Umur):</span>
                               <span className="font-bold text-slate-700 font-mono">{result.assessment.indices.tbu.z.toFixed(2)}</span>
                             </div>
-                            <div className="flex justify-between items-center text-[11px]">
-                              <span className="text-slate-500 font-semibold">BB/TB (Berat/Tinggi):</span>
+                            <div className="flex justify-between items-start text-[11px]">
+                              <div>
+                                <div className="text-slate-500 font-semibold">BB/{result.data.umur_bulan < 24 ? 'PB (Berat/Panjang)' : 'TB (Berat/Tinggi)'}:</div>
+                                <div className="text-[9px] text-slate-400 font-normal mt-0.5">*{result.data.umur_bulan < 24 ? 'BB/PB - 0-23 Bulan' : 'BB/TB - 24-60 Bulan'}</div>
+                              </div>
                               <span className="font-bold text-slate-700 font-mono">{result.assessment.indices.bbtb.z.toFixed(2)}</span>
                             </div>
                           </div>

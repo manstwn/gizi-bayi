@@ -19,6 +19,11 @@ const DummyData = sequelize.define('DummyData', {
     type: DataTypes.FLOAT,
     allowNull: false,
   },
+  jenis_kelamin: {
+    type: DataTypes.ENUM('L', 'P'),
+    allowNull: false,
+    defaultValue: 'L',
+  },
   kategori_gizi: {
     type: DataTypes.STRING,
     allowNull: false,
