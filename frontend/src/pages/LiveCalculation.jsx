@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 import { Activity, Cpu, ArrowRight, RefreshCw, BarChart3, TrendingUp, Info, CheckCircle2 } from 'lucide-react';
+import { cn } from '../utils/cn';
 
 const LiveCalculation = () => {
   const [inputs, setInputs] = useState({
@@ -12,6 +13,116 @@ const LiveCalculation = () => {
   const [loading, setLoading] = useState(false);
 
   const [isFollowMode, setIsFollowMode] = useState(false);
+
+  const [balitaList, setBalitaList] = useState([]);
+  const [selectedBalita, setSelectedBalita] = useState(null);
+  const [search, setSearch] = useState('');
+  const [isAgeLocked, setIsAgeLocked] = useState(false);
+
+  useEffect(() => {
+    if (search.length >= 2) {
+      const fetchBalita = async () => {
+        try {
+          const response = await api.get(`/balita?search=${search}`);
+          setBalitaList(response.data);
+        } catch (error) {
+          console.error('Error fetching balita:', error);
+        }
+      };
+      fetchBalita();
+    } else {
+      setBalitaList([]);
+    }
+  }, [search]);
+
+  const handleSelectBalita = (item) => {
+    setSelectedBalita(item);
+    
+    // Calculate age in months
+    const birthDate = new Date(item.tanggal_lahir);
+    const today = new Date();
+    const diffMonth = (today.getFullYear() - birthDate.getFullYear()) * 12 + (today.getMonth() - birthDate.getMonth());
+    const umur = diffMonth >= 0 ? diffMonth : 0;
+
+    setInputs(prev => ({ ...prev, umur }));
+    setIsAgeLocked(true);
+    setSearch('');
+    setBalitaList([]);
+  };
+
+  const handleClearBalita = () => {
+    setSelectedBalita(null);
+    setIsAgeLocked(false);
+  };
+
+  const formatIndoVal = (val, unit) => {
+    if (val == null || isNaN(val)) return '--';
+    return `${val.toFixed(1).replace('.', ',')} ${unit}`;
+  };
+
+  const calculateSDPosition = (val, ref) => {
+    if (!ref || val == null) return 50;
+    const { minus3SD, minus2SD, median, plus2SD, plus3SD } = ref;
+    if (minus3SD == null || minus2SD == null || median == null || plus2SD == null || plus3SD == null) return 50;
+
+    if (val <= minus3SD) return 0;
+    if (val <= minus2SD) {
+      return 0 + 25 * ((val - minus3SD) / (minus2SD - minus3SD));
+    }
+    if (val <= median) {
+      return 25 + 25 * ((val - minus2SD) / (median - minus2SD));
+    }
+    if (val <= plus2SD) {
+      return 50 + 25 * ((val - median) / (plus2SD - median));
+    }
+    if (val <= plus3SD) {
+      return 75 + 25 * ((val - plus2SD) / (plus3SD - plus2SD));
+    }
+    return 100;
+  };
+
+  const renderSDRangeBar = (currentVal, refData) => {
+    if (!refData || currentVal == null) return null;
+    const min = refData.minus3SD;
+    const max = refData.plus3SD;
+    if (min == null || max == null || max === min) return null;
+    
+    const percentage = calculateSDPosition(currentVal, refData);
+    
+    let dotColor = "bg-emerald-500 ring-emerald-100";
+    if (currentVal < refData.minus2SD) {
+      dotColor = "bg-rose-500 ring-rose-100";
+    } else if (currentVal > refData.plus2SD) {
+      dotColor = "bg-amber-500 ring-amber-100";
+    }
+    
+    return (
+      <tr className="border-none">
+        <td colSpan="2" className="py-0"></td>
+        <td colSpan="5" className="py-2 pb-6 pr-4">
+          <div className="relative w-full h-1.5 bg-slate-100 rounded-full">
+            {/* Range bar background colors */}
+            <div className="absolute left-0 w-1/4 h-full bg-rose-400 rounded-l-full opacity-60" />
+            <div className="absolute left-1/4 w-2/4 h-full bg-emerald-400 opacity-60" />
+            <div className="absolute left-3/4 w-1/4 h-full bg-amber-400 rounded-r-full opacity-60" />
+
+            {/* Static ticks under the columns */}
+            <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-white/70" />
+            <div className="absolute left-1/4 top-0 bottom-0 w-0.5 bg-white/70" />
+            <div className="absolute left-2/4 top-0 bottom-0 w-0.5 bg-white/70" />
+            <div className="absolute left-3/4 top-0 bottom-0 w-0.5 bg-white/70" />
+            <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white/70" />
+
+            {/* Current Value Dot */}
+            <div 
+              className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full ${dotColor} border-2 border-white shadow ring-4 ring-white/40 transition-all duration-500`}
+              style={{ left: `${percentage}%` }}
+            />
+          </div>
+        </td>
+      </tr>
+    );
+  };
 
   const simulate = useCallback(async () => {
     try {
@@ -41,48 +152,7 @@ const LiveCalculation = () => {
     return () => clearTimeout(timer);
   }, [simulate]);
 
-  const ZScoreGauge = ({ label, value, title, category }) => {
-    // ... (Keep existing Gauge code, maybe polish colors later)
-    const percentage = Math.min(Math.max(((value + 4) / 8) * 100, 0), 100);
-    const getColor = (v) => {
-      if (v < -3 || v > 3) return 'bg-rose-600';
-      if (v < -2 || v > 2) return 'bg-amber-500';
-      return 'bg-emerald-500';
-    };
 
-    return (
-      <div className="bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm space-y-4 hover:shadow-md transition-shadow">
-        <div className="flex justify-between items-start">
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{title}</p>
-            <h4 className="font-bold text-slate-800">{label}</h4>
-          </div>
-          <div className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${getColor(value)} text-white shadow-sm`}>
-            Z: {value.toFixed(2)}
-          </div>
-        </div>
-        
-        <div className="relative h-4 w-full bg-slate-50 rounded-full overflow-hidden border border-slate-100">
-          <div className="absolute inset-0 flex justify-between px-[12.5%] opacity-10 pointer-events-none">
-            {[...Array(7)].map((_, i) => <div key={i} className="border-l border-slate-900 h-full"></div>)}
-          </div>
-          <div className={`absolute top-0 bottom-0 transition-all duration-700 ease-out ${getColor(value)}`} style={{ left: '0', width: `${percentage}%` }}></div>
-        </div>
-        
-        <div className="flex justify-between text-[8px] font-black text-slate-400 uppercase px-1">
-          <span>-4 SD</span>
-          <span>Median</span>
-          <span>+4 SD</span>
-        </div>
-
-        <div className={`p-3 rounded-2xl text-xs font-bold text-center ${
-          category.includes('Normal') || category.includes('Baik') ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
-        }`}>
-          {category}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-700 pb-10">
@@ -103,7 +173,72 @@ const LiveCalculation = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-4 space-y-8">
+        <div className="lg:col-span-4 space-y-6">
+          {/* Pilih Balita Contoh */}
+          <div className="bg-white rounded-[2rem] p-6 border border-slate-200 shadow-sm relative">
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">
+              Pilih Balita Contoh (Opsional)
+            </h3>
+            
+            {!selectedBalita ? (
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Cari nama balita..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="input-field h-10 text-sm pl-9"
+                />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <span className="text-xs">🔍</span>
+                </div>
+                
+                {balitaList.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl z-50 overflow-hidden max-h-48 overflow-y-auto">
+                    {balitaList.map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => handleSelectBalita(item)}
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center justify-between text-xs border-b border-slate-50 last:border-0"
+                      >
+                        <div>
+                          <p className="font-bold text-slate-800">{item.nama}</p>
+                          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{item.nama_orang_tua}</p>
+                        </div>
+                        <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">
+                          {(() => {
+                            const birth = new Date(item.tanggal_lahir);
+                            const today = new Date();
+                            const diff = (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
+                            return diff >= 0 ? `${diff} bln` : '0 bln';
+                          })()}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <span className="text-xl">👶</span>
+                  <div>
+                    <p className="font-black text-indigo-900 text-xs">{selectedBalita.nama}</p>
+                    <p className="text-[9px] text-indigo-400 font-bold uppercase tracking-wider">
+                      Umur Terkunci: {inputs.umur} Bulan
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleClearBalita}
+                  className="px-3 py-1 bg-white hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-lg text-[9px] font-black uppercase tracking-widest transition-colors"
+                >
+                  Ganti
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="bg-white rounded-[2rem] p-6 border border-slate-200 shadow-xl shadow-slate-200/40 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-medical-50/50 rounded-full -mr-16 -mt-16 blur-3xl"></div>
             
@@ -119,16 +254,26 @@ const LiveCalculation = () => {
                   <span className="text-4xl font-black text-slate-900 leading-none">{inputs.umur}</span>
                 </div>
                 <input type="range" min="0" max="60" step="1" value={inputs.umur}
+                  disabled={isAgeLocked}
                   onChange={(e) => setInputs({...inputs, umur: parseInt(e.target.value)})}
-                  className="w-full h-2 bg-slate-100 rounded-full appearance-none cursor-pointer accent-medical-500 hover:accent-medical-600 transition-all"
+                  className={cn(
+                    "w-full h-2 rounded-full appearance-none transition-all",
+                    isAgeLocked 
+                      ? "bg-slate-200 accent-slate-400 cursor-not-allowed opacity-50" 
+                      : "bg-slate-100 accent-medical-500 hover:accent-medical-600 cursor-pointer"
+                  )}
                 />
                 <button 
-                  onClick={() => setIsFollowMode(!isFollowMode)}
-                  className={`w-full py-3 rounded-2xl transition-all duration-300 flex items-center justify-center space-x-3 border ${
-                    isFollowMode 
-                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-100' 
-                      : 'bg-white border-slate-200 text-slate-400 hover:text-emerald-500 hover:border-emerald-200 hover:bg-emerald-50'
-                  }`}
+                  onClick={() => !isAgeLocked && setIsFollowMode(!isFollowMode)}
+                  disabled={isAgeLocked}
+                  className={cn(
+                    "w-full py-3 rounded-2xl transition-all duration-300 flex items-center justify-center space-x-3 border",
+                    isAgeLocked
+                      ? "bg-slate-50 border-slate-200 text-slate-300 cursor-not-allowed"
+                      : isFollowMode 
+                        ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-100' 
+                        : 'bg-white border-slate-200 text-slate-400 hover:text-emerald-500 hover:border-emerald-200 hover:bg-emerald-50'
+                  )}
                 >
                   <CheckCircle2 size={18} className={isFollowMode ? 'animate-pulse' : ''} />
                   <span className="text-[10px] font-black uppercase tracking-widest">
@@ -224,48 +369,87 @@ const LiveCalculation = () => {
         {/* Right: Indices Visualizations */}
         <div className="lg:col-span-8 space-y-6">
           {result && result.indices ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <ZScoreGauge 
-                title="Weight-for-Age" 
-                label="Berat Badan menurut Umur" 
-                value={result.indices.bbu?.z ?? 0} 
-                category={result.indices.bbu?.category ?? 'Calculating...'} 
-              />
-              <ZScoreGauge 
-                title="Height-for-Age" 
-                label="Tinggi Badan menurut Umur" 
-                value={result.indices.tbu?.z ?? 0} 
-                category={result.indices.tbu?.category ?? 'Calculating...'} 
-              />
-              <ZScoreGauge 
-                title="Weight-for-Height" 
-                label="Berat Badan menurut Tinggi Badan" 
-                value={result.indices.bbtb?.z ?? 0} 
-                category={result.indices.bbtb?.category ?? 'Calculating...'} 
-              />
+            <div className="bg-white rounded-[2rem] p-6 border border-slate-200 shadow-sm overflow-hidden">
+              <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center">
+                <span className="bg-slate-900 text-white w-6 h-6 rounded-full flex items-center justify-center text-[10px] mr-3">✓</span>
+                Hasil Analisis Z-Score & Status Gizi
+              </h3>
               
-              <div className="bg-slate-900 rounded-[2rem] p-6 text-white flex flex-col justify-center space-y-4 shadow-xl border border-white/5">
-                <div className="flex items-center space-x-3 text-medical-400">
-                  <TrendingUp size={20} />
-                  <h3 className="text-[10px] font-black uppercase tracking-widest">Kesimpulan Assessment</h3>
+              <div className="overflow-x-auto mb-6">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="pb-4 text-[10px] font-black text-slate-400 uppercase">Indeks Antropometri</th>
+                      <th className="pb-4 text-[10px] font-black text-slate-400 uppercase">Z-Score</th>
+                      <th className="pb-4 text-[10px] font-black text-slate-400 uppercase">Kategori Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    <tr>
+                      <td className="py-4 font-bold text-slate-700 text-xs">Berat Badan menurut Umur (BB/U)</td>
+                      <td className="py-4 text-xs font-mono font-black text-slate-800">
+                        {result.indices.bbu?.z ? (result.indices.bbu.z >= 0 ? '+' : '') + result.indices.bbu.z.toFixed(2).replace('.', ',') : '0,00'}
+                      </td>
+                      <td className="py-4 text-xs">
+                        <span className={cn(
+                          "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight",
+                          result.indices.bbu?.category.includes('Normal') ? "bg-green-50 text-green-600 border border-green-100" : "bg-rose-50 text-rose-600 border border-rose-100"
+                        )}>
+                          {result.indices.bbu?.category}
+                        </span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-4 font-bold text-slate-700 text-xs">Tinggi Badan menurut Umur (TB/U)</td>
+                      <td className="py-4 text-xs font-mono font-black text-slate-800">
+                        {result.indices.tbu?.z ? (result.indices.tbu.z >= 0 ? '+' : '') + result.indices.tbu.z.toFixed(2).replace('.', ',') : '0,00'}
+                      </td>
+                      <td className="py-4 text-xs">
+                        <span className={cn(
+                          "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight",
+                          result.indices.tbu?.category.includes('Normal') ? "bg-green-50 text-green-600 border border-green-100" : "bg-rose-50 text-rose-600 border border-rose-100"
+                        )}>
+                          {result.indices.tbu?.category}
+                        </span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-4 font-bold text-slate-700 text-xs">Berat Badan menurut Tinggi Badan (BB/TB)</td>
+                      <td className="py-4 text-xs font-mono font-black text-slate-800">
+                        {result.indices.bbtb?.z ? (result.indices.bbtb.z >= 0 ? '+' : '') + result.indices.bbtb.z.toFixed(2).replace('.', ',') : '0,00'}
+                      </td>
+                      <td className="py-4 text-xs">
+                        <span className={cn(
+                          "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight",
+                          result.indices.bbtb?.category.includes('Normal') || result.indices.bbtb?.category.includes('Baik') ? "bg-green-50 text-green-600 border border-green-100" : "bg-rose-50 text-rose-600 border border-rose-100"
+                        )}>
+                          {result.indices.bbtb?.category}
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Ringkasan Kesimpulan */}
+              <div className="bg-slate-900 rounded-3xl p-5 text-white grid grid-cols-3 gap-4 border border-white/5">
+                <div className="text-center">
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Status Gizi (BB/TB)</p>
+                  <p className="text-xs font-black text-emerald-400 truncate">{result.indices.bbtb?.category || '--'}</p>
                 </div>
-                
-                <div className="space-y-4">
-                  <div className="p-5 bg-white/5 rounded-3xl border border-white/10">
-                    <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Status Gizi (BB/TB)</p>
-                    <p className="text-lg font-black text-emerald-400 leading-tight">{result.indices.bbtb?.category ?? '--'}</p>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className={`p-4 rounded-3xl border ${result.summary?.stunting === 'Normal' ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
-                      <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">Stunting</p>
-                      <p className="text-xs font-black">{result.summary?.stunting ?? '--'}</p>
-                    </div>
-                    <div className={`p-4 rounded-3xl border ${result.summary?.underweight === 'Normal' ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
-                      <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">Underweight</p>
-                      <p className="text-xs font-black">{result.summary?.underweight ?? '--'}</p>
-                    </div>
-                  </div>
+                <div className="text-center border-x border-white/10">
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Stunting (TB/U)</p>
+                  <p className={cn(
+                    "text-xs font-black truncate",
+                    result.summary?.stunting === 'Normal' ? 'text-emerald-400' : 'text-rose-400'
+                  )}>{result.summary?.stunting || '--'}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Underweight (BB/U)</p>
+                  <p className={cn(
+                    "text-xs font-black truncate",
+                    result.summary?.underweight === 'Normal' ? 'text-emerald-400' : 'text-rose-400'
+                  )}>{result.summary?.underweight || '--'}</p>
                 </div>
               </div>
             </div>
@@ -289,34 +473,45 @@ const LiveCalculation = () => {
                   <thead>
                     <tr className="border-b border-slate-100">
                       <th className="pb-4 text-[10px] font-black text-slate-400 uppercase">Indeks</th>
+                      <th className="pb-4 text-[10px] font-black text-indigo-600 uppercase">Nilai Sekarang</th>
                       <th className="pb-4 text-[10px] font-black text-rose-500 uppercase">-3SD</th>
                       <th className="pb-4 text-[10px] font-black text-rose-400 uppercase">-2SD</th>
                       <th className="pb-4 text-[10px] font-black text-emerald-600 uppercase">Median</th>
                       <th className="pb-4 text-[10px] font-black text-blue-500 uppercase">+2SD</th>
+                      <th className="pb-4 text-[10px] font-black text-blue-600 uppercase">+3SD</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     <tr>
-                      <td className="py-4 font-bold text-slate-700 text-xs">Berat Badan menurut Umur</td>
-                      <td className="py-4 text-xs font-medium">{result.indices.bbu?.ref?.minus3SD?.toFixed(2) ?? '--'}</td>
-                      <td className="py-4 text-xs font-medium">{result.indices.bbu?.ref?.minus2SD?.toFixed(2) ?? '--'}</td>
-                      <td className="py-4 text-xs font-bold text-emerald-600">{result.indices.bbu?.ref?.median?.toFixed(2) ?? '--'}</td>
-                      <td className="py-4 text-xs font-medium">{result.indices.bbu?.ref?.plus2SD?.toFixed(2) ?? '--'}</td>
+                      <td className="py-4 font-bold text-slate-700 text-xs">Berat Badan menurut Umur ({inputs.umur} Bulan)</td>
+                      <td className="py-4 text-xs font-black text-indigo-600">{inputs.bb.toFixed(1).replace('.', ',')} Kg</td>
+                      <td className="py-4 text-xs font-medium">{formatIndoVal(result.indices.bbu?.ref?.minus3SD, 'Kg')}</td>
+                      <td className="py-4 text-xs font-medium">{formatIndoVal(result.indices.bbu?.ref?.minus2SD, 'Kg')}</td>
+                      <td className="py-4 text-xs font-bold text-emerald-600">{formatIndoVal(result.indices.bbu?.ref?.median, 'Kg')}</td>
+                      <td className="py-4 text-xs font-medium">{formatIndoVal(result.indices.bbu?.ref?.plus2SD, 'Kg')}</td>
+                      <td className="py-4 text-xs font-medium">{formatIndoVal(result.indices.bbu?.ref?.plus3SD, 'Kg')}</td>
                     </tr>
+                    {renderSDRangeBar(inputs.bb, result.indices.bbu?.ref)}
                     <tr>
-                      <td className="py-4 font-bold text-slate-700 text-xs">Tinggi Badan menurut Umur</td>
-                      <td className="py-4 text-xs font-medium">{result.indices.tbu?.ref?.minus3SD?.toFixed(2) ?? '--'}</td>
-                      <td className="py-4 text-xs font-medium">{result.indices.tbu?.ref?.minus2SD?.toFixed(2) ?? '--'}</td>
-                      <td className="py-4 text-xs font-bold text-emerald-600">{result.indices.tbu?.ref?.median?.toFixed(2) ?? '--'}</td>
-                      <td className="py-4 text-xs font-medium">{result.indices.tbu?.ref?.plus2SD?.toFixed(2) ?? '--'}</td>
+                      <td className="py-4 font-bold text-slate-700 text-xs">Tinggi Badan menurut Umur ({inputs.umur} Bulan)</td>
+                      <td className="py-4 text-xs font-black text-indigo-600">{inputs.tb.toFixed(1).replace('.', ',')} cm</td>
+                      <td className="py-4 text-xs font-medium">{formatIndoVal(result.indices.tbu?.ref?.minus3SD, 'cm')}</td>
+                      <td className="py-4 text-xs font-medium">{formatIndoVal(result.indices.tbu?.ref?.minus2SD, 'cm')}</td>
+                      <td className="py-4 text-xs font-bold text-emerald-600">{formatIndoVal(result.indices.tbu?.ref?.median, 'cm')}</td>
+                      <td className="py-4 text-xs font-medium">{formatIndoVal(result.indices.tbu?.ref?.plus2SD, 'cm')}</td>
+                      <td className="py-4 text-xs font-medium">{formatIndoVal(result.indices.tbu?.ref?.plus3SD, 'cm')}</td>
                     </tr>
+                    {renderSDRangeBar(inputs.tb, result.indices.tbu?.ref)}
                     <tr>
-                      <td className="py-4 font-bold text-slate-700 text-xs">Berat Badan menurut Tinggi Badan</td>
-                      <td className="py-4 text-xs font-medium">{result.indices.bbtb?.ref?.minus3SD?.toFixed(2) ?? '--'}</td>
-                      <td className="py-4 text-xs font-medium">{result.indices.bbtb?.ref?.minus2SD?.toFixed(2) ?? '--'}</td>
-                      <td className="py-4 text-xs font-bold text-emerald-600">{result.indices.bbtb?.ref?.median?.toFixed(2) ?? '--'}</td>
-                      <td className="py-4 text-xs font-medium">{result.indices.bbtb?.ref?.plus2SD?.toFixed(2) ?? '--'}</td>
+                      <td className="py-4 font-bold text-slate-700 text-xs">Berat Badan menurut Tinggi Badan ({inputs.tb.toFixed(1).replace('.', ',')} cm)</td>
+                      <td className="py-4 text-xs font-black text-indigo-600">{inputs.bb.toFixed(1).replace('.', ',')} Kg</td>
+                      <td className="py-4 text-xs font-medium">{formatIndoVal(result.indices.bbtb?.ref?.minus3SD, 'Kg')}</td>
+                      <td className="py-4 text-xs font-medium">{formatIndoVal(result.indices.bbtb?.ref?.minus2SD, 'Kg')}</td>
+                      <td className="py-4 text-xs font-bold text-emerald-600">{formatIndoVal(result.indices.bbtb?.ref?.median, 'Kg')}</td>
+                      <td className="py-4 text-xs font-medium">{formatIndoVal(result.indices.bbtb?.ref?.plus2SD, 'Kg')}</td>
+                      <td className="py-4 text-xs font-medium">{formatIndoVal(result.indices.bbtb?.ref?.plus3SD, 'Kg')}</td>
                     </tr>
+                    {renderSDRangeBar(inputs.bb, result.indices.bbtb?.ref)}
                   </tbody>
                 </table>
               </div>

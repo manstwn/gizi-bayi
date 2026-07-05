@@ -3,6 +3,7 @@ const sequelize = require('./config/database');
 const User = require('./models/User');
 const NaiveBayesModel = require('./models/NaiveBayesModel');
 const DummyData = require('./models/DummyData');
+const Pemeriksaan = require('./models/Pemeriksaan');
 require('dotenv').config();
 
 const PORT = process.env.PORT || 5000;
@@ -12,7 +13,31 @@ const startServer = async () => {
     await sequelize.authenticate();
     console.log('Database connected successfully.');
 
-    // Sync models
+    // Custom migration to safely add columns in SQLite (prevents alter: true UNIQUE/FK check bugs)
+    try {
+      const queryInterface = sequelize.getQueryInterface();
+      const tableDefinition = await queryInterface.describeTable(Pemeriksaan.tableName);
+      
+      if (!tableDefinition.metode) {
+        await queryInterface.addColumn(Pemeriksaan.tableName, 'metode', {
+          type: require('sequelize').DataTypes.STRING,
+          defaultValue: 'WHO',
+        });
+        console.log("Added 'metode' column to Pemeriksaan table.");
+      }
+      
+      if (!tableDefinition.model_id) {
+        await queryInterface.addColumn(Pemeriksaan.tableName, 'model_id', {
+          type: require('sequelize').DataTypes.INTEGER,
+          allowNull: true,
+        });
+        console.log("Added 'model_id' column to Pemeriksaan table.");
+      }
+    } catch (migErr) {
+      console.error('Error running custom migrations:', migErr.message);
+    }
+
+    // Sync models safely
     await sequelize.sync({ force: false });
     console.log('Database synced.');
 

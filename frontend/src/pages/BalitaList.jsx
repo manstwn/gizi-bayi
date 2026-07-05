@@ -10,7 +10,8 @@ import {
   MapPin,
   Calendar,
   X,
-  Smartphone
+  Smartphone,
+  History
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 
@@ -28,6 +29,40 @@ const BalitaList = () => {
     alamat: '',
     kontak: ''
   });
+
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [historyData, setHistoryData] = useState([]);
+  const [selectedBalitaForHistory, setSelectedBalitaForHistory] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const handleOpenHistory = async (item) => {
+    setSelectedBalitaForHistory(item);
+    setIsHistoryModalOpen(true);
+    setHistoryLoading(true);
+    try {
+      const response = await api.get(`/pemeriksaan/balita/${item.id}`);
+      setHistoryData(response.data);
+    } catch (error) {
+      console.error('Error fetching balita history:', error);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handleDeleteHistory = async (id) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus data pemeriksaan ini?')) return;
+    try {
+      await api.delete(`/pemeriksaan/${id}`);
+      // Refresh history data
+      if (selectedBalitaForHistory) {
+        const response = await api.get(`/pemeriksaan/balita/${selectedBalitaForHistory.id}`);
+        setHistoryData(response.data);
+      }
+    } catch (error) {
+      console.error('Error deleting checkup:', error);
+      alert('Gagal menghapus data pemeriksaan. Pastikan Anda memiliki akses admin.');
+    }
+  };
 
   const fetchBalita = async () => {
     try {
@@ -82,12 +117,13 @@ const BalitaList = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Hapus data balita ini secara permanen?')) {
+    if (window.confirm('Hapus data balita ini beserta semua riwayat pemeriksaannya secara permanen?')) {
       try {
         await api.delete(`/balita/${id}`);
         fetchBalita();
       } catch (error) {
         console.error('Error deleting balita:', error);
+        alert('Gagal menghapus data balita. Pastikan Anda memiliki akses admin.');
       }
     }
   };
@@ -177,6 +213,13 @@ const BalitaList = () => {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end space-x-1">
+                        <button 
+                          onClick={() => handleOpenHistory(item)} 
+                          title="Lihat Riwayat Pemeriksaan"
+                          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
+                        >
+                          <History size={16} />
+                        </button>
                         <button onClick={() => handleOpenModal(item)} className="p-2 text-medical-600 hover:bg-medical-50 rounded-xl transition-colors">
                           <Edit2 size={16} />
                         </button>
@@ -213,6 +256,7 @@ const BalitaList = () => {
                   <h4 className="font-bold text-slate-800 text-base mb-1">{item.nama}</h4>
                   <p className="text-xs text-slate-500 font-medium mb-3">{item.nama_orang_tua} • {item.kontak}</p>
                   <div className="flex space-x-2">
+                    <button onClick={() => handleOpenHistory(item)} className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest">Riwayat</button>
                     <button onClick={() => handleOpenModal(item)} className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest">Edit</button>
                     <button onClick={() => handleDelete(item.id)} className="px-3 py-1.5 bg-rose-50 text-rose-500 rounded-lg text-[10px] font-black uppercase tracking-widest">Hapus</button>
                   </div>
@@ -326,6 +370,120 @@ const BalitaList = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal Overlay */}
+      {isHistoryModalOpen && selectedBalitaForHistory && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden scale-in">
+            <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center space-x-3">
+                 <div className="bg-indigo-500 p-2.5 rounded-2xl text-white shadow-lg shadow-indigo-100">
+                    <History size={24} />
+                 </div>
+                 <div>
+                    <h3 className="text-xl font-black text-slate-800 tracking-tight">
+                      Riwayat Pemeriksaan
+                    </h3>
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">
+                      {selectedBalitaForHistory.nama} ({selectedBalitaForHistory.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'})
+                    </p>
+                 </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsHistoryModalOpen(false);
+                  setHistoryData([]);
+                  setSelectedBalitaForHistory(null);
+                }} 
+                className="w-10 h-10 flex items-center justify-center text-slate-400 hover:bg-white hover:text-slate-600 rounded-full transition-all shadow-sm"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="p-8 max-h-[60vh] overflow-y-auto">
+              {historyLoading ? (
+                <div className="py-12 text-center text-slate-400 font-medium italic">
+                  Memuat data riwayat...
+                </div>
+              ) : historyData.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100">
+                          <th className="px-4 py-3">Tanggal</th>
+                          <th className="px-4 py-3">Umur</th>
+                          <th className="px-4 py-3">Berat/Tinggi</th>
+                          <th className="px-4 py-3">Metode</th>
+                          <th className="px-4 py-3">Status Gizi</th>
+                          <th className="px-4 py-3 text-right">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {historyData.map((p) => (
+                          <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-3.5 font-bold text-slate-600">{p.tanggal_pemeriksaan}</td>
+                            <td className="px-4 py-3.5 text-slate-600 font-medium">{p.umur_bulan} bln</td>
+                            <td className="px-4 py-3.5 text-slate-600 font-medium">{p.berat_badan}kg / {p.tinggi_badan}cm</td>
+                            <td className="px-4 py-3.5">
+                              <span className="px-2 py-0.5 bg-slate-100 rounded text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                                {p.metode || 'WHO'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <span className={cn(
+                                 "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight shadow-sm inline-block",
+                                 p.kategori_gizi === 'Gizi Baik' ? "bg-green-50 text-green-600 border border-green-100" :
+                                 p.kategori_gizi === 'Gizi Lebih' ? "bg-indigo-50 text-indigo-600 border border-indigo-100" :
+                                 p.kategori_gizi === 'Gizi Kurang' ? "bg-amber-50 text-amber-600 border border-amber-100" :
+                                 "bg-rose-50 text-rose-600 border border-rose-100"
+                              )}>
+                                {p.kategori_gizi}
+                              </span>
+                              {p.catatan && (
+                                <p className="text-[10px] text-slate-400 mt-1 italic font-medium">
+                                  Catatan: {p.catatan}
+                                </p>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5 text-right">
+                              <button
+                                onClick={() => handleDeleteHistory(p.id)}
+                                className="p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 rounded-lg transition-colors inline-flex items-center"
+                                title="Hapus Data Pemeriksaan"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-12 text-center text-slate-400 font-medium italic">
+                  Belum ada riwayat pemeriksaan untuk balita ini.
+                </div>
+              )}
+            </div>
+            
+            <div className="p-8 border-t border-slate-50 bg-slate-50/50 flex justify-end">
+              <button
+                onClick={() => {
+                  setIsHistoryModalOpen(false);
+                  setHistoryData([]);
+                  setSelectedBalitaForHistory(null);
+                }}
+                className="px-6 py-2.5 text-sm font-bold text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}

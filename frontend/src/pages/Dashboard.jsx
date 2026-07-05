@@ -263,7 +263,9 @@ const Dashboard = () => {
                         </div>
                         <div>
                           <p className="font-bold text-slate-800 text-sm">{p.Balita?.nama}</p>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">ID: {p.balita_id}</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
+                            ID: {p.balita_id} • {p.metode || 'WHO'}
+                          </p>
                         </div>
                       </div>
                     </td>
@@ -283,10 +285,16 @@ const Dashboard = () => {
                     </td>
                     <td className="px-6 py-4">
                        <div className="flex items-center space-x-2">
-                          <div className="flex-1 bg-slate-100 h-1.5 w-16 rounded-full overflow-hidden">
-                             <div className="bg-medical-500 h-full" style={{ width: `${p.hasil_fuzzy}%` }}></div>
-                          </div>
-                          <span className="text-xs font-black text-slate-700 font-mono">{p.hasil_fuzzy.toFixed(1)}</span>
+                          {(p.metode || 'WHO') === 'Naive Bayes' ? (
+                            <>
+                              <div className="flex-1 bg-slate-100 h-1.5 w-16 rounded-full overflow-hidden">
+                                 <div className="bg-medical-500 h-full" style={{ width: `${p.hasil_fuzzy}%` }}></div>
+                              </div>
+                              <span className="text-xs font-black text-slate-700 font-mono" title="Tingkat Keyakinan">{p.hasil_fuzzy.toFixed(1)}%</span>
+                            </>
+                          ) : (
+                            <span className="text-xs font-black text-slate-700 font-mono" title="Z-Score BB/TB">Z: {p.hasil_fuzzy.toFixed(2)}</span>
+                          )}
                        </div>
                     </td>
                   </tr>

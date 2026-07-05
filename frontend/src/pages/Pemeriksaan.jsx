@@ -28,6 +28,24 @@ const Pemeriksaan = () => {
   });
   
   const [result, setResult] = useState(null);
+  const [metode, setMetode] = useState('WHO');
+  const [selectedModelId, setSelectedModelId] = useState('');
+  const [models, setModels] = useState([]);
+
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const response = await api.get('/naive-bayes/models');
+        setModels(response.data);
+        if (response.data.length > 0) {
+          setSelectedModelId(response.data[0].id);
+        }
+      } catch (error) {
+        console.error('Error fetching Naive Bayes models:', error);
+      }
+    };
+    fetchModels();
+  }, []);
 
   useEffect(() => {
     if (search.length >= 2) {
@@ -71,6 +89,8 @@ const Pemeriksaan = () => {
     try {
       const response = await api.post('/pemeriksaan', {
         balita_id: selectedBalita.id,
+        metode,
+        model_id: metode === 'Naive Bayes' ? selectedModelId : null,
         ...formData
       });
       setResult(response.data);
@@ -85,7 +105,7 @@ const Pemeriksaan = () => {
         catatan: ''
       });
     } catch (error) {
-      console.error('Error calculating fuzzy:', error);
+      console.error('Error calculating:', error);
       alert('Gagal melakukan perhitungan. Pastikan data input valid.');
     } finally {
       setLoading(false);
@@ -208,6 +228,76 @@ const Pemeriksaan = () => {
                     />
                   </div>
                 </div>
+                {/* Pilihan Metode Klasifikasi */}
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-4">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                    Metode Klasifikasi Status Gizi
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setMetode('WHO')}
+                      className={cn(
+                        "p-4 rounded-xl border-2 text-sm font-bold text-center transition-all flex flex-col items-center justify-center gap-2",
+                        metode === 'WHO'
+                          ? "bg-white border-medical-500 text-medical-600 shadow-md shadow-medical-100"
+                          : "bg-white/50 border-slate-200 text-slate-500 hover:border-slate-300"
+                      )}
+                    >
+                      <span className="text-lg">📊</span>
+                      <span>Standar WHO (Antropometri)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMetode('Naive Bayes')}
+                      className={cn(
+                        "p-4 rounded-xl border-2 text-sm font-bold text-center transition-all flex flex-col items-center justify-center gap-2",
+                        metode === 'Naive Bayes'
+                          ? "bg-white border-medical-500 text-medical-600 shadow-md shadow-medical-100"
+                          : "bg-white/50 border-slate-200 text-slate-500 hover:border-slate-300"
+                      )}
+                    >
+                      <span className="text-lg">🧠</span>
+                      <span>Gaussian Naive Bayes</span>
+                    </button>
+                  </div>
+
+                  {metode === 'Naive Bayes' && (
+                    <div className="pt-2 animate-in fade-in slide-in-from-top-1 duration-300">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+                        Pilih Model Naive Bayes
+                      </label>
+                      {models.length > 0 ? (
+                        <select
+                          value={selectedModelId}
+                          onChange={(e) => setSelectedModelId(e.target.value)}
+                          className="input-field h-12 text-sm font-bold bg-white"
+                        >
+                          {models.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.nama_model} (Akurasi: {m.akurasi}%, Data: {m.jumlah_data})
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="bg-rose-50 border border-rose-100 text-rose-700 p-4 rounded-xl text-xs flex items-start gap-2.5">
+                          <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="font-bold">Model belum tersedia!</p>
+                            <p className="mt-1 text-[11px] font-medium leading-relaxed">
+                              Silakan latih model terlebih dahulu di menu{' '}
+                              <a href="/naive-bayes/train" className="underline font-bold hover:text-rose-900">
+                                Train Naive Bayes
+                              </a>{' '}
+                              sebelum menggunakan metode ini.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Observasi Tambahan (Opsional)</label>
                   <textarea
@@ -228,7 +318,11 @@ const Pemeriksaan = () => {
                   ) : (
                     <>
                       <Calculator size={24} />
-                      <span>Jalankan Analisis Fuzzy</span>
+                      <span>
+                        {metode === 'Naive Bayes' 
+                          ? 'Jalankan Klasifikasi Naive Bayes' 
+                          : 'Jalankan Klasifikasi WHO'}
+                      </span>
                       <ArrowRight size={20} className="ml-2 group-hover:translate-x-1 transition-transform" />
                     </>
                   )}
@@ -250,6 +344,7 @@ const Pemeriksaan = () => {
                     <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
                       <th className="px-6 py-4">Tanggal Check</th>
                       <th className="px-6 py-4">Antropometri</th>
+                      <th className="px-6 py-4">Metode</th>
                       <th className="px-6 py-4">Kategori Nutrisi</th>
                     </tr>
                   </thead>
@@ -258,19 +353,27 @@ const Pemeriksaan = () => {
                       <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-6 py-4 font-bold text-slate-600">{p.tanggal_pemeriksaan}</td>
                         <td className="px-6 py-4">
-                          <span className="text-xs font-medium text-slate-500">{p.berat_badan}kg <span className="text-slate-200mx-1">•</span> {p.tinggi_badan}cm <span className="text-slate-200 mx-1">•</span> {p.umur_bulan} bln</span>
+                          <span className="text-xs font-medium text-slate-500">{p.berat_badan}kg <span className="text-slate-200 mx-1">•</span> {p.tinggi_badan}cm <span className="text-slate-200 mx-1">•</span> {p.umur_bulan} bln</span>
+                        </td>
+                        <td className="px-6 py-4 text-xs font-bold text-slate-500">
+                          <span className="px-2 py-1 bg-slate-100 rounded-md uppercase tracking-wider text-[9px]">
+                            {p.metode || 'WHO'}
+                          </span>
                         </td>
                         <td className="px-6 py-4">
                           <span className={cn(
                              "px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight",
-                             p.kategori_gizi === 'Gizi Baik' ? "bg-green-50 text-green-600" : "bg-amber-50 text-amber-600"
+                             p.kategori_gizi === 'Gizi Baik' ? "bg-green-50 text-green-600" :
+                             p.kategori_gizi === 'Gizi Lebih' ? "bg-indigo-50 text-indigo-600" :
+                             p.kategori_gizi === 'Gizi Kurang' ? "bg-amber-50 text-amber-600" :
+                             "bg-rose-50 text-rose-600"
                           )}>
                             {p.kategori_gizi}
                           </span>
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan="3" className="px-6 py-8 text-center text-slate-400 italic">Belum ada rekam medis sebelumnya.</td></tr>
+                      <tr><td colSpan="4" className="px-6 py-8 text-center text-slate-400 italic">Belum ada rekam medis sebelumnya.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -296,9 +399,12 @@ const Pemeriksaan = () => {
                   {result ? (
                     <div className="space-y-8 animate-in zoom-in-95 duration-500">
                       <div className="text-center bg-slate-50 rounded-[2rem] p-8 border border-slate-100 shadow-inner">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Status Nutrisi Final</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Status Nutrisi Final</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-4">
+                          Metode: {result.data.metode || 'WHO'}
+                        </p>
                         <div className={cn(
-                          "inline-block px-6 py-3 rounded-2xl text-2xl font-black shadow-lg shadow-current/10 tracking-tight",
+                          "inline-block px-6 py-3 rounded-2xl text-2xl font-black shadow-lg shadow-current/10 tracking-tight mb-6",
                           result.data.kategori_gizi === 'Gizi Baik' ? "bg-green-500 text-white" :
                           result.data.kategori_gizi === 'Gizi Lebih' ? "bg-medical-500 text-white" :
                           result.data.kategori_gizi === 'Gizi Kurang' ? "bg-amber-500 text-white" :
@@ -307,29 +413,58 @@ const Pemeriksaan = () => {
                           {result.data.kategori_gizi}
                         </div>
                         
-                        <div className="mt-8 flex items-center justify-center space-x-1">
-                           <span className="text-xs font-bold text-slate-400">Skor Defuzzifikasi:</span>
-                           <span className="text-lg font-black text-slate-800 font-mono">{result.data.hasil_fuzzy.toFixed(2)}</span>
-                        </div>
+                        {(result.data.metode || 'WHO') === 'WHO' ? (
+                          <div className="flex items-center justify-center space-x-1">
+                             <span className="text-xs font-bold text-slate-400">Z-Score BB/TB:</span>
+                             <span className="text-lg font-black text-slate-800 font-mono">{result.data.hasil_fuzzy.toFixed(2)}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center space-x-1">
+                             <span className="text-xs font-bold text-slate-400">Model Keyakinan:</span>
+                             <span className="text-lg font-black text-slate-800 font-mono">{result.data.hasil_fuzzy.toFixed(1)}%</span>
+                          </div>
+                        )}
+
+                        {result.assessment && (
+                          <div className="mt-6 pt-4 border-t border-slate-200/60 text-left space-y-2">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">WHO Z-Scores:</p>
+                            <div className="flex justify-between items-center text-[11px]">
+                              <span className="text-slate-500 font-semibold">BB/U (Berat/Umur):</span>
+                              <span className="font-bold text-slate-700 font-mono">{result.assessment.indices.bbu.z.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-[11px]">
+                              <span className="text-slate-500 font-semibold">TB/U (Tinggi/Umur):</span>
+                              <span className="font-bold text-slate-700 font-mono">{result.assessment.indices.tbu.z.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-[11px]">
+                              <span className="text-slate-500 font-semibold">BB/TB (Berat/Tinggi):</span>
+                              <span className="font-bold text-slate-700 font-mono">{result.assessment.indices.bbtb.z.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       
-                      <div className="space-y-3">
-                         <div className="flex justify-between items-end px-1">
-                            <span className="text-[10px] font-black text-slate-400 uppercase">Indeks Keyakinan</span>
-                            <span className="text-sm font-black text-medical-600">{result.data.hasil_fuzzy.toFixed(0)}%</span>
-                         </div>
-                         <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
-                           <div 
-                             className="bg-medical-500 h-full transition-all duration-1000 ease-out" 
-                             style={{ width: `${result.data.hasil_fuzzy}%` }}
-                           ></div>
-                         </div>
-                      </div>
+                      {(result.data.metode || 'WHO') === 'Naive Bayes' && (
+                        <div className="space-y-3">
+                           <div className="flex justify-between items-end px-1">
+                              <span className="text-[10px] font-black text-slate-400 uppercase">Indeks Keyakinan</span>
+                              <span className="text-sm font-black text-medical-600">{result.data.hasil_fuzzy.toFixed(0)}%</span>
+                           </div>
+                           <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                             <div 
+                               className="bg-medical-500 h-full transition-all duration-1000 ease-out" 
+                               style={{ width: `${result.data.hasil_fuzzy}%` }}
+                             ></div>
+                           </div>
+                        </div>
+                      )}
 
                       <div className="bg-medical-50 p-5 rounded-2xl flex items-start space-x-3 border border-medical-100">
                          <Info size={20} className="text-medical-600 flex-shrink-0 mt-0.5" />
                          <p className="text-xs text-medical-800 font-medium leading-relaxed italic">
-                           Hasil ini dihitung otomatis menggunakan rule-base Fuzzy Mamdani. Gunakan sebagai bahan pertimbangan medis utama.
+                           {(result.data.metode || 'WHO') === 'Naive Bayes' 
+                             ? "Hasil ini dihitung menggunakan model klasifikasi Gaussian Naive Bayes berdasarkan Z-Score antropometri WHO."
+                             : "Hasil ini dihitung otomatis menggunakan standar antropometri pertumbuhan anak WHO."}
                          </p>
                       </div>
                     </div>

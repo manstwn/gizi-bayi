@@ -39,6 +39,14 @@ const Pemeriksaan = sequelize.define('Pemeriksaan', {
   kategori_gizi: {
     type: DataTypes.STRING, // Gizi Buruk, Gizi Kurang, Gizi Baik, Gizi Lebih
   },
+  metode: {
+    type: DataTypes.STRING,
+    defaultValue: 'WHO', // 'WHO' or 'Naive Bayes'
+  },
+  model_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
   petugas_id: {
     type: DataTypes.INTEGER,
     references: {

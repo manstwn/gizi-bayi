@@ -1,4 +1,5 @@
 const Balita = require('../models/Balita');
+const Pemeriksaan = require('../models/Pemeriksaan');
 const { Op } = require('sequelize');
 
 exports.getAllBalita = async (req, res) => {
@@ -54,6 +55,9 @@ exports.deleteBalita = async (req, res) => {
   try {
     const balita = await Balita.findByPk(req.params.id);
     if (!balita) return res.status(404).json({ message: 'Balita not found' });
+    
+    // Cascade delete: Delete all related pemeriksaan (checkup) records first
+    await Pemeriksaan.destroy({ where: { balita_id: balita.id } });
     
     await balita.destroy();
     res.json({ message: 'Balita deleted successfully' });

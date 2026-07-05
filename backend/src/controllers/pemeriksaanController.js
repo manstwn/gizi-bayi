@@ -1,21 +1,56 @@
 const Pemeriksaan = require('../models/Pemeriksaan');
 const Balita = require('../models/Balita');
 const NutritionalStatusService = require('../services/nutritionalStatusService');
+const NaiveBayesModel = require('../models/NaiveBayesModel');
+const nbService = require('../services/naiveBayesService');
 
 exports.createPemeriksaan = async (req, res) => {
   try {
-    const { balita_id, berat_badan, tinggi_badan, umur_bulan, tanggal_pemeriksaan, catatan } = req.body;
+    const { balita_id, berat_badan, tinggi_badan, umur_bulan, tanggal_pemeriksaan, catatan, metode = 'WHO', model_id } = req.body;
     
     // Validate balita existence
     const balita = await Balita.findByPk(balita_id);
     if (!balita) return res.status(404).json({ message: 'Balita not found' });
 
-    // Calculate Assessment using new Z-Score logic
+    // 1. Always calculate Z-Score Assessment using WHO Z-Score logic
     const assessment = NutritionalStatusService.assess(
       parseFloat(berat_badan), 
       parseFloat(tinggi_badan), 
       parseFloat(umur_bulan)
     );
+
+    let finalKategori = assessment.summary.status;
+    let finalHasilFuzzy = assessment.indices.bbtb.z; // default WHO Z-score
+    let finalModelId = null;
+    let prediction = null;
+
+    // 2. If Naive Bayes classification is selected
+    if (metode === 'Naive Bayes') {
+      let savedModel;
+      if (model_id) {
+        savedModel = await NaiveBayesModel.findByPk(model_id);
+      } else {
+        // Fallback to latest trained model
+        savedModel = await NaiveBayesModel.findOne({ order: [['created_at', 'DESC']] });
+      }
+
+      if (!savedModel) {
+        return res.status(400).json({ 
+          message: 'Belum ada model Naive Bayes yang disimpan. Silakan latih model terlebih dahulu.' 
+        });
+      }
+
+      finalModelId = savedModel.id;
+      const modelData = savedModel.model_json;
+      
+      const z_bbu = assessment.indices.bbu.z;
+      const z_tbu = assessment.indices.tbu.z;
+      const z_bbtb = assessment.indices.bbtb.z;
+
+      prediction = nbService.predictFromModel(modelData, z_bbu, z_tbu, z_bbtb);
+      finalKategori = prediction.predicted_class;
+      finalHasilFuzzy = prediction.confidence; // Store confidence percentage (0-100)
+    }
 
     const pemeriksaan = await Pemeriksaan.create({
       balita_id,
@@ -23,16 +58,19 @@ exports.createPemeriksaan = async (req, res) => {
       tinggi_badan,
       umur_bulan,
       tanggal_pemeriksaan: tanggal_pemeriksaan || new Date(),
-      hasil_fuzzy: assessment.indices.bbtb.z, // Storing primary Z-score
-      kategori_gizi: assessment.summary.status,
+      hasil_fuzzy: finalHasilFuzzy,
+      kategori_gizi: finalKategori,
       petugas_id: req.user.id,
-      catatan
+      catatan,
+      metode,
+      model_id: finalModelId
     });
 
     res.status(201).json({
       message: 'Pemeriksaan saved successfully',
       data: pemeriksaan,
-      assessment: assessment
+      assessment: assessment,
+      prediction: prediction
     });
   } catch (error) {
     res.status(400).json({ message: 'Error creating pemeriksaan', error: error.message });

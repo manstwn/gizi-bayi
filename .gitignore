@@ -27,3 +27,23 @@ backend/database.sqlite-journal
 **/.env
 **/.env.*
 !**/.env.example
+
+# --- Databases ---
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.db
+*.db-journal
+
+# --- OS and System files ---
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# --- Build and ESLint Caches ---
+.eslintcache
+.parcel-cache
+.next/
+.nuxt/
+.cache/
+.vite/
