@@ -44,11 +44,30 @@ exports.createPemeriksaan = async (req, res) => {
       finalModelId = savedModel.id;
       const modelData = savedModel.model_json;
       
-      const z_bbu = assessment.indices.bbu.z;
-      const z_tbu = assessment.indices.tbu.z;
-      const z_bbtb = assessment.indices.bbtb.z;
+      const bbuMap = {
+        'Berat badan sangat kurang': 'Sangat Kurang',
+        'Berat badan kurang': 'Kurang',
+        'Berat badan normal': 'Normal',
+        'Risiko berat badan lebih': 'Badan Lebih'
+      };
+      const tbuMap = {
+        'Sangat pendek': 'Sangat Pendek',
+        'Pendek': 'Pendek',
+        'Normal': 'Normal',
+        'Tinggi': 'Tinggi'
+      };
+      const bbtbMap = {
+        'Gizi buruk': 'Gizi Buruk',
+        'Gizi kurang': 'Gizi Kurang',
+        'Gizi baik': 'Normal',
+        'Gizi lebih': 'Gizi Lebih'
+      };
 
-      prediction = nbService.predictFromModel(modelData, z_bbu, z_tbu, z_bbtb);
+      const bbuCategory = bbuMap[assessment.indices.bbu.category] || assessment.indices.bbu.category;
+      const tbuCategory = tbuMap[assessment.indices.tbu.category] || assessment.indices.tbu.category;
+      const bbtbCategory = bbtbMap[assessment.indices.bbtb.category] || assessment.indices.bbtb.category;
+
+      prediction = nbService.predictFromModel(modelData, bbuCategory, tbuCategory, bbtbCategory);
       finalKategori = prediction.predicted_class;
       finalHasilFuzzy = prediction.confidence; // Store confidence percentage (0-100)
     }
