@@ -187,7 +187,7 @@ class NutritionalStatusService {
   getBBTBCategory(z) {
     if (z < -3) return 'Gizi buruk';
     if (z < -2) return 'Gizi kurang';
-    if (z <= 1) return 'Gizi baik';
+    if (z <= 2) return 'Gizi baik';
     return 'Gizi lebih';
   }
 

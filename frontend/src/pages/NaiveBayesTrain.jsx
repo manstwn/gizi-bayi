@@ -286,7 +286,7 @@ const getBBTBCategoryText = (z) => {
   if (z == null || isNaN(z)) return '—';
   if (z < -3) return 'Gizi buruk';
   if (z < -2) return 'Gizi kurang';
-  if (z <= 1) return 'Gizi baik';
+  if (z <= 2) return 'Gizi baik';
   return 'Gizi lebih';
 };
 
@@ -459,7 +459,7 @@ const NaiveBayesTrain = () => {
                 type="text"
                 value={modelName}
                 onChange={(e) => setModelName(e.target.value)}
-                placeholder={`Gaussian NB - ${new Date().toLocaleDateString('id-ID')}`}
+                placeholder={`Categorical NB - ${new Date().toLocaleDateString('id-ID')}`}
                 className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-transparent"
               />
             </div>

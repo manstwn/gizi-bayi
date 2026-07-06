@@ -258,7 +258,7 @@ const Pemeriksaan = () => {
                       )}
                     >
                       <span className="text-lg">🧠</span>
-                      <span>Gaussian Naive Bayes</span>
+                      <span>Categorical Naive Bayes</span>
                     </button>
                   </div>
 
@@ -469,7 +469,7 @@ const Pemeriksaan = () => {
                          <Info size={20} className="text-medical-600 flex-shrink-0 mt-0.5" />
                          <p className="text-xs text-medical-800 font-medium leading-relaxed italic">
                            {(result.data.metode || 'WHO') === 'Naive Bayes' 
-                             ? "Hasil ini dihitung menggunakan model klasifikasi Gaussian Naive Bayes berdasarkan Z-Score antropometri WHO."
+                             ? "Hasil ini dihitung menggunakan model klasifikasi Categorical Naive Bayes berdasarkan Z-Score antropometri WHO."
                              : "Hasil ini dihitung otomatis menggunakan standar antropometri pertumbuhan anak WHO."}
                          </p>
                       </div>
