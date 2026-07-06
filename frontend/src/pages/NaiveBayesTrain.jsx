@@ -427,10 +427,9 @@ const NaiveBayesTrain = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
           { label: 'Data Utama',       value: mainCount,  color: 'blue'   },
-          { label: 'Data Dummy',       value: dummyCount, color: 'teal'   },
           { label: 'Model Tersimpan',  value: models.length, color: 'violet' },
           { label: 'Akurasi Test Set', value: models[0]?.akurasi != null ? `${models[0].akurasi}%` : '—', color: 'emerald' },
         ].map((stat) => (
@@ -464,43 +463,7 @@ const NaiveBayesTrain = () => {
               />
             </div>
 
-            {/* Data Source */}
-            <div>
-              <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Sumber Data Pelatihan</label>
-              <div className="space-y-2">
-                {DATA_SOURCES.map((src) => {
-                  const count = src.key === 'main' ? mainCount : src.key === 'dummy' ? dummyCount : mainCount + dummyCount;
-                  const isSelected = dataSource === src.key;
-                  const SrcIcon = src.icon;
-                  return (
-                    <button
-                      key={src.key}
-                      onClick={() => setDataSource(src.key)}
-                      className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left ${
-                        isSelected ? `${src.bg} ring-2 ${src.ring} ring-offset-1` : 'bg-slate-50 border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className={`p-1.5 rounded-xl ${isSelected ? `bg-${src.color}-100` : 'bg-white'}`}>
-                        <SrcIcon size={16} className={isSelected ? src.text : 'text-slate-400'} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`font-black text-xs ${isSelected ? src.text : 'text-slate-600'}`}>{src.label}</p>
-                        <p className="text-[10px] text-slate-400 font-medium">{src.desc}</p>
-                      </div>
-                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${isSelected ? `bg-${src.color}-200 ${src.text}` : 'bg-slate-200 text-slate-500'}`}>
-                        {count} data
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
 
-            {dataSource === 'both' && (
-              <div className="p-3 bg-violet-50 border border-violet-100 rounded-2xl text-[10px] font-semibold text-violet-600">
-                {mainCount} data utama + {dummyCount} data dummy = {mainCount + dummyCount} total data latih
-              </div>
-            )}
 
             {error && (
               <div className="flex items-start gap-3 p-4 bg-rose-50 border border-rose-200 rounded-2xl">
@@ -594,7 +557,7 @@ const NaiveBayesTrain = () => {
             <SectionCard
               icon={Table2}
               title="Data Latih (Preview)"
-              subtitle={`${trainingData.total} data utama · ${dummyCount} data dummy`}
+              subtitle={`${trainingData.total} data utama`}
               color="violet"
               action={
                 <button
@@ -652,60 +615,6 @@ const NaiveBayesTrain = () => {
                             </td>
                           </tr>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Tabel Data Dummy */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-teal-500" />
-                      Data Dummy (Preview)
-                    </h4>
-                    <span className="text-[10px] font-black text-slate-400 px-2 py-0.5 bg-slate-100 rounded-full">
-                      {trainingData.dummyTotal} Data Dummy
-                    </span>
-                  </div>
-                  <div className="overflow-x-auto border border-slate-100 rounded-2xl">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 border-b border-slate-100">
-                        <tr>
-                          {['Nama', 'Status', 'Umur', 'BB', 'TB', 'Z BB/U', 'Z TB/U', 'Z BB/TB', 'Kelas'].map((h, i) => (
-                            <th key={i} className="py-2.5 px-3 font-black uppercase tracking-wide text-slate-400 text-[10px]">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50">
-                        {(trainingData.dummyRecords || []).slice(0, 10).map((r) => (
-                          <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="py-2 px-3 font-semibold text-slate-700 max-w-[120px] truncate">{r.nama || '—'}</td>
-                            <td className="py-2 px-3">
-                              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-teal-50 text-teal-600">
-                                {r.status_data}
-                              </span>
-                            </td>
-                            <td className="py-2 px-3 text-slate-600">{r.umur_bulan} bln</td>
-                            <td className="py-2 px-3 text-slate-600">{r.berat_badan} kg</td>
-                            <td className="py-2 px-3 text-slate-600">{r.tinggi_badan} cm</td>
-                            <td className="py-2 px-3">{formatZScoreCell(r.zscores?.z_bbu, getBBUCategoryText(r.zscores?.z_bbu))}</td>
-                            <td className="py-2 px-3">{formatZScoreCell(r.zscores?.z_tbu, getTBUCategoryText(r.zscores?.z_tbu))}</td>
-                            <td className="py-2 px-3">{formatZScoreCell(r.zscores?.z_bbtb, getBBTBCategoryText(r.zscores?.z_bbtb))}</td>
-                            <td className="py-2 px-3">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${classColor(r.kategori_gizi)}`}>
-                                {r.kategori_gizi?.split('(')[0].trim() || '—'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                        {(!trainingData.dummyRecords || trainingData.dummyRecords.length === 0) && (
-                          <tr>
-                            <td colSpan={9} className="py-8 text-center text-slate-400 font-bold text-xs">
-                              Tidak ada data dummy untuk ditampilkan.
-                            </td>
-                          </tr>
-                        )}
                       </tbody>
                     </table>
                   </div>
@@ -918,30 +827,17 @@ const NaiveBayesTrain = () => {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="flex bg-slate-100 p-1 rounded-2xl">
-                    <button
-                      onClick={() => setModalTab('main')}
-                      className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${
-                        modalTab === 'main' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                      }`}
-                    >
+                    <span className="px-4 py-2 text-xs font-black rounded-xl bg-white text-slate-900 shadow-sm">
                       Data Utama ({trainingData?.records?.length || 0})
-                    </button>
-                    <button
-                      onClick={() => setModalTab('dummy')}
-                      className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${
-                        modalTab === 'dummy' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                      }`}
-                    >
-                      Data Dummy ({trainingData?.dummyRecords?.length || 0})
-                    </button>
+                    </span>
                   </div>
 
                   {/* Export Buttons */}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => {
-                        const targetData = modalTab === 'main' ? trainingData?.records : trainingData?.dummyRecords;
-                        const filename = `data_latih_${modalTab}_${new Date().toISOString().slice(0, 10)}.csv`;
+                        const targetData = trainingData?.records;
+                        const filename = `data_latih_utama_${new Date().toISOString().slice(0, 10)}.csv`;
                         downloadCSV(targetData, filename);
                       }}
                       className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-100 hover:border-emerald-200 rounded-2xl font-black text-[10px] uppercase tracking-wider transition-all shadow-sm"
@@ -950,8 +846,8 @@ const NaiveBayesTrain = () => {
                     </button>
                     <button
                       onClick={() => {
-                        const targetData = modalTab === 'main' ? trainingData?.records : trainingData?.dummyRecords;
-                        const filename = `data_latih_${modalTab}_${new Date().toISOString().slice(0, 10)}.xls`;
+                        const targetData = trainingData?.records;
+                        const filename = `data_latih_utama_${new Date().toISOString().slice(0, 10)}.xls`;
                         downloadExcelXLS(targetData, filename);
                       }}
                       className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-100 hover:border-blue-200 rounded-2xl font-black text-[10px] uppercase tracking-wider transition-all shadow-sm"
