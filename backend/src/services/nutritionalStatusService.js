@@ -9,14 +9,66 @@ class NutritionalStatusService {
   calculateZScore(value, ref) {
     if (!ref) return 0;
     
-    const { median, plus1SD, minus1SD } = ref;
+    const { minus3SD, minus2SD, minus1SD, median, plus1SD, plus2SD, plus3SD } = ref;
     
+    if (
+      minus3SD != null && minus2SD != null && minus1SD != null && 
+      median != null && 
+      plus1SD != null && plus2SD != null && plus3SD != null
+    ) {
+      if (value === median) return 0;
+      
+      if (value < median) {
+        if (value >= minus1SD) {
+          // Between 0 and -1 SD
+          const diff = median - minus1SD;
+          return diff > 0 ? (value - median) / diff : 0;
+        } else if (value >= minus2SD) {
+          // Between -1 and -2 SD
+          const diff = minus1SD - minus2SD;
+          const dist = minus1SD - value;
+          return -1 - (diff > 0 ? (dist / diff) : 0);
+        } else if (value >= minus3SD) {
+          // Between -2 and -3 SD
+          const diff = minus2SD - minus3SD;
+          const dist = minus2SD - value;
+          return -2 - (diff > 0 ? (dist / diff) : 0);
+        } else {
+          // Below -3 SD (extrapolate using the -2 to -3 SD interval)
+          const diff = minus2SD - minus3SD;
+          const dist = minus3SD - value;
+          return -3 - (diff > 0 ? (dist / diff) : 0);
+        }
+      } else {
+        if (value <= plus1SD) {
+          // Between 0 and +1 SD
+          const diff = plus1SD - median;
+          return diff > 0 ? (value - median) / diff : 0;
+        } else if (value <= plus2SD) {
+          // Between +1 and +2 SD
+          const diff = plus2SD - plus1SD;
+          const dist = value - plus1SD;
+          return 1 + (diff > 0 ? (dist / diff) : 0);
+        } else if (value <= plus3SD) {
+          // Between +2 and +3 SD
+          const diff = plus3SD - plus2SD;
+          const dist = value - plus2SD;
+          return 2 + (diff > 0 ? (dist / diff) : 0);
+        } else {
+          // Above +3 SD (extrapolate using the +2 to +3 SD interval)
+          const diff = plus3SD - plus2SD;
+          const dist = value - plus3SD;
+          return 3 + (diff > 0 ? (dist / diff) : 0);
+        }
+      }
+    }
+    
+    // Fallback to simple calculation
+    const { plus1SD: p1, minus1SD: m1 } = ref;
     if (value >= median) {
-      // Positive Z-Score
-      return (value - median) / (plus1SD - median);
+      return (p1 - median) > 0 ? (value - median) / (p1 - median) : 0;
     } else {
-      // Negative Z-Score
-      return (value - median) / (median - minus1SD);
+      return (median - m1) > 0 ? (value - median) / (median - m1) : 0;
     }
   }
 
