@@ -265,6 +265,42 @@ const downloadExcelXLS = (data, filename) => {
   document.body.removeChild(link);
 };
 
+// ─── Z-Score Category Helpers ────────────────────────────────────────────────
+const getBBUCategoryText = (z) => {
+  if (z == null || isNaN(z)) return '—';
+  if (z < -3) return 'Berat badan sangat kurang';
+  if (z < -2) return 'Berat badan kurang';
+  if (z <= 1) return 'Berat badan normal';
+  return 'Risiko berat badan lebih';
+};
+
+const getTBUCategoryText = (z) => {
+  if (z == null || isNaN(z)) return '—';
+  if (z < -3) return 'Sangat pendek';
+  if (z < -2) return 'Pendek';
+  if (z <= 3) return 'Normal';
+  return 'Tinggi';
+};
+
+const getBBTBCategoryText = (z) => {
+  if (z == null || isNaN(z)) return '—';
+  if (z < -3) return 'Gizi buruk';
+  if (z < -2) return 'Gizi kurang';
+  if (z <= 1) return 'Gizi baik';
+  if (z <= 2) return 'Gizi lebih';
+  return 'Obesitas';
+};
+
+const formatZScoreCell = (z, category) => {
+  if (z == null || isNaN(z)) return <span className="text-slate-400">—</span>;
+  return (
+    <div className="flex flex-col">
+      <span className="text-[10px] text-slate-400 font-bold leading-tight">({category})</span>
+      <span className="font-mono text-slate-700 text-xs font-semibold leading-tight mt-0.5">{z.toFixed(2)}</span>
+    </div>
+  );
+};
+
 // ─── Data Source Selector ────────────────────────────────────────────────────
 
 const DATA_SOURCES = [
@@ -571,9 +607,9 @@ const NaiveBayesTrain = () => {
                             <td className="py-2 px-3 text-slate-600">{r.umur_bulan} bln</td>
                             <td className="py-2 px-3 text-slate-600">{r.berat_badan} kg</td>
                             <td className="py-2 px-3 text-slate-600">{r.tinggi_badan} cm</td>
-                            <td className="py-2 px-3 font-mono text-[10px] text-slate-500">{r.zscores?.z_bbu ?? '—'}</td>
-                            <td className="py-2 px-3 font-mono text-[10px] text-slate-500">{r.zscores?.z_tbu ?? '—'}</td>
-                            <td className="py-2 px-3 font-mono text-[10px] text-slate-500">{r.zscores?.z_bbtb ?? '—'}</td>
+                            <td className="py-2 px-3">{formatZScoreCell(r.zscores?.z_bbu, getBBUCategoryText(r.zscores?.z_bbu))}</td>
+                            <td className="py-2 px-3">{formatZScoreCell(r.zscores?.z_tbu, getTBUCategoryText(r.zscores?.z_tbu))}</td>
+                            <td className="py-2 px-3">{formatZScoreCell(r.zscores?.z_bbtb, getBBTBCategoryText(r.zscores?.z_bbtb))}</td>
                             <td className="py-2 px-3">
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${classColor(r.kategori_gizi)}`}>
                                 {r.kategori_gizi?.split('(')[0].trim() || '—'}
@@ -618,9 +654,9 @@ const NaiveBayesTrain = () => {
                             <td className="py-2 px-3 text-slate-600">{r.umur_bulan} bln</td>
                             <td className="py-2 px-3 text-slate-600">{r.berat_badan} kg</td>
                             <td className="py-2 px-3 text-slate-600">{r.tinggi_badan} cm</td>
-                            <td className="py-2 px-3 font-mono text-[10px] text-slate-500">{r.zscores?.z_bbu ?? '—'}</td>
-                            <td className="py-2 px-3 font-mono text-[10px] text-slate-500">{r.zscores?.z_tbu ?? '—'}</td>
-                            <td className="py-2 px-3 font-mono text-[10px] text-slate-500">{r.zscores?.z_bbtb ?? '—'}</td>
+                            <td className="py-2 px-3">{formatZScoreCell(r.zscores?.z_bbu, getBBUCategoryText(r.zscores?.z_bbu))}</td>
+                            <td className="py-2 px-3">{formatZScoreCell(r.zscores?.z_tbu, getTBUCategoryText(r.zscores?.z_tbu))}</td>
+                            <td className="py-2 px-3">{formatZScoreCell(r.zscores?.z_bbtb, getBBTBCategoryText(r.zscores?.z_bbtb))}</td>
                             <td className="py-2 px-3">
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${classColor(r.kategori_gizi)}`}>
                                 {r.kategori_gizi?.split('(')[0].trim() || '—'}
@@ -910,9 +946,9 @@ const NaiveBayesTrain = () => {
                           <td className="py-3 px-4 text-slate-600">{r.umur_bulan} bln</td>
                           <td className="py-3 px-4 text-slate-600">{r.berat_badan} kg</td>
                           <td className="py-3 px-4 text-slate-600">{r.tinggi_badan} cm</td>
-                          <td className="py-3 px-4 font-mono text-[10px] text-slate-500">{r.zscores?.z_bbu ?? '—'}</td>
-                          <td className="py-3 px-4 font-mono text-[10px] text-slate-500">{r.zscores?.z_tbu ?? '—'}</td>
-                          <td className="py-3 px-4 font-mono text-[10px] text-slate-500">{r.zscores?.z_bbtb ?? '—'}</td>
+                          <td className="py-3 px-4">{formatZScoreCell(r.zscores?.z_bbu, getBBUCategoryText(r.zscores?.z_bbu))}</td>
+                          <td className="py-3 px-4">{formatZScoreCell(r.zscores?.z_tbu, getTBUCategoryText(r.zscores?.z_tbu))}</td>
+                          <td className="py-3 px-4">{formatZScoreCell(r.zscores?.z_bbtb, getBBTBCategoryText(r.zscores?.z_bbtb))}</td>
                           <td className="py-3 px-4">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${classColor(r.kategori_gizi)}`}>
                               {r.kategori_gizi || '—'}

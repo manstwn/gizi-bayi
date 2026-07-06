@@ -76,19 +76,19 @@ class NutritionalStatusService {
    * Get Category for BB/U (Weight-for-Age)
    */
   getBBUCategory(z) {
-    if (z < -3) return 'Sangat Kurang (Severely Underweight)';
-    if (z < -2) return 'Kurang (Underweight)';
-    if (z <= 1) return 'Berat Badan Normal';
-    return 'Risiko Berat Badan Lebih';
+    if (z < -3) return 'Berat badan sangat kurang';
+    if (z < -2) return 'Berat badan kurang';
+    if (z <= 1) return 'Berat badan normal';
+    return 'Risiko berat badan lebih';
   }
 
   /**
    * Get Category for TB/U (Height-for-Age)
    */
   getTBUCategory(z) {
-    if (z < -3) return 'Sangat Pendek (Severely Stunted)';
-    if (z < -2) return 'Pendek (Stunted)';
-    if (z <= 3) return 'Tinggi Badan Normal';
+    if (z < -3) return 'Sangat pendek';
+    if (z < -2) return 'Pendek';
+    if (z <= 3) return 'Normal';
     return 'Tinggi';
   }
 
@@ -96,11 +96,10 @@ class NutritionalStatusService {
    * Get Category for BB/TB (Weight-for-Height)
    */
   getBBTBCategory(z) {
-    if (z < -3) return 'Gizi Buruk (Severely Wasted)';
-    if (z < -2) return 'Gizi Kurang (Wasted)';
-    if (z <= 1) return 'Gizi Baik (Normal)';
-    if (z <= 2) return 'Berisiko Gizi Lebih';
-    if (z <= 3) return 'Gizi Lebih (Overweight)';
+    if (z < -3) return 'Gizi buruk';
+    if (z < -2) return 'Gizi kurang';
+    if (z <= 1) return 'Gizi baik';
+    if (z <= 2) return 'Gizi lebih';
     return 'Obesitas';
   }
 

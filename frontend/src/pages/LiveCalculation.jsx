@@ -461,7 +461,7 @@ const LiveCalculation = () => {
                       <td className="py-4 text-xs">
                         <span className={cn(
                           "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight",
-                          result.indices.tbu?.category.includes('Normal') ? "bg-green-50 text-green-600 border border-green-100" : "bg-rose-50 text-rose-600 border border-rose-100"
+                          result.indices.tbu?.category?.toLowerCase().includes('normal') ? "bg-green-50 text-green-600 border border-green-100" : "bg-rose-50 text-rose-600 border border-rose-100"
                         )}>
                           {result.indices.tbu?.category}
                         </span>
@@ -478,7 +478,7 @@ const LiveCalculation = () => {
                       <td className="py-4 text-xs">
                         <span className={cn(
                           "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight",
-                          result.indices.bbtb?.category.includes('Normal') || result.indices.bbtb?.category.includes('Baik') ? "bg-green-50 text-green-600 border border-green-100" : "bg-rose-50 text-rose-600 border border-rose-100"
+                          result.indices.bbtb?.category?.toLowerCase().includes('normal') || result.indices.bbtb?.category?.toLowerCase().includes('baik') ? "bg-green-50 text-green-600 border border-green-100" : "bg-rose-50 text-rose-600 border border-rose-100"
                         )}>
                           {result.indices.bbtb?.category}
                         </span>
