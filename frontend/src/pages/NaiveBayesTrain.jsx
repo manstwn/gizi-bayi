@@ -36,16 +36,19 @@ const classColorHex = (cls) => {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-const SectionCard = ({ icon: Icon, title, subtitle, children, color = 'blue' }) => (
+const SectionCard = ({ icon: Icon, title, subtitle, children, color = 'blue', action }) => (
   <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-    <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-      <div className={`p-2 rounded-xl bg-${color}-50`}>
-        <Icon size={18} className={`text-${color}-600`} />
+    <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <div className={`p-2 rounded-xl bg-${color}-50`}>
+          <Icon size={18} className={`text-${color}-600`} />
+        </div>
+        <div>
+          <h3 className="font-black text-slate-900 text-sm">{title}</h3>
+          {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+        </div>
       </div>
-      <div>
-        <h3 className="font-black text-slate-900 text-sm">{title}</h3>
-        {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
-      </div>
+      {action && <div>{action}</div>}
     </div>
     <div className="p-6">{children}</div>
   </div>
@@ -182,6 +185,86 @@ const MetricsTable = ({ perClass, macro, classes }) => {
   );
 };
 
+// ─── Export Helpers ──────────────────────────────────────────────────────────
+const downloadCSV = (data, filename) => {
+  if (!data || data.length === 0) return;
+  const headers = ['ID', 'Nama', 'Jenis Kelamin', 'Umur (Bulan)', 'Berat Badan (kg)', 'Tinggi Badan (cm)', 'Z BB/U', 'Z TB/U', 'Z BB/TB', 'Kategori Gizi', 'Status'];
+  const rows = data.map(r => [
+    r.id,
+    `"${r.nama || '—'}"`,
+    r.jenis_kelamin || '—',
+    r.umur_bulan,
+    r.berat_badan,
+    r.tinggi_badan,
+    r.zscores?.z_bbu ?? '—',
+    r.zscores?.z_tbu ?? '—',
+    r.zscores?.z_bbtb ?? '—',
+    `"${r.kategori_gizi || '—'}"`,
+    r.status_data
+  ]);
+  const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+const downloadExcelXLS = (data, filename) => {
+  if (!data || data.length === 0) return;
+  let tableHtml = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+      <!--[if gte mso 9]>
+      <xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
+      <x:Name>Data Latih</x:Name>
+      <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+      </x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml>
+      <![endif]-->
+      <meta charset="utf-8">
+    </head>
+    <body>
+      <table border="1">
+        <tr style="background-color: #7c3aed; color: #ffffff; font-weight: bold;">
+          <th>ID</th><th>Nama</th><th>Jenis Kelamin</th><th>Umur (Bulan)</th>
+          <th>Berat Badan (kg)</th><th>Tinggi Badan (cm)</th>
+          <th>Z BB/U</th><th>Z TB/U</th><th>Z BB/TB</th><th>Kategori Gizi</th><th>Status</th>
+        </tr>
+  `;
+
+  data.forEach(r => {
+    tableHtml += `
+      <tr>
+        <td>${r.id}</td>
+        <td>${r.nama || '—'}</td>
+        <td>${r.jenis_kelamin || '—'}</td>
+        <td>${r.umur_bulan}</td>
+        <td>${r.berat_badan}</td>
+        <td>${r.tinggi_badan}</td>
+        <td>${r.zscores?.z_bbu ?? '—'}</td>
+        <td>${r.zscores?.z_tbu ?? '—'}</td>
+        <td>${r.zscores?.z_bbtb ?? '—'}</td>
+        <td>${r.kategori_gizi || '—'}</td>
+        <td>${r.status_data}</td>
+      </tr>
+    `;
+  });
+
+  tableHtml += `</table></body></html>`;
+
+  const blob = new Blob([tableHtml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 // ─── Data Source Selector ────────────────────────────────────────────────────
 
 const DATA_SOURCES = [
@@ -201,6 +284,9 @@ const NaiveBayesTrain = () => {
   const [error, setError]               = useState(null);
   const [modelName, setModelName]       = useState('');
   const [dataSource, setDataSource]     = useState('main');
+  const [modalOpen, setModalOpen]       = useState(false);
+  const [modalTab, setModalTab]         = useState('main');
+  const [searchQuery, setSearchQuery]   = useState('');
 
   const fetchAll = useCallback(async () => {
     setLoading((l) => ({ ...l, data: true, models: true }));
@@ -439,40 +525,120 @@ const NaiveBayesTrain = () => {
               title="Data Latih (Preview)"
               subtitle={`${trainingData.total} data utama · ${dummyCount} data dummy`}
               color="violet"
+              action={
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setModalTab('main');
+                    setModalOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-100 hover:border-violet-200 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all shadow-sm"
+                >
+                  <Table2 size={12} /> Buka Full View
+                </button>
+              }
             >
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-100">
-                      {['Nama', 'Umur', 'BB', 'TB', 'Z BB/U', 'Z TB/U', 'Z BB/TB', 'Kelas'].map((h, i) => (
-                        <th key={i} className="pb-3 font-black uppercase tracking-wide text-slate-400 pr-3 text-[10px]">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {trainingData.records.slice(0, 10).map((r) => (
-                      <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="py-2 pr-3 font-semibold text-slate-700 max-w-[80px] truncate">{r.nama || '—'}</td>
-                        <td className="py-2 pr-2 text-slate-600">{r.umur_bulan}</td>
-                        <td className="py-2 pr-2 text-slate-600">{r.berat_badan}</td>
-                        <td className="py-2 pr-2 text-slate-600">{r.tinggi_badan}</td>
-                        <td className="py-2 pr-2 font-mono text-[10px] text-slate-500">{r.zscores?.z_bbu ?? '—'}</td>
-                        <td className="py-2 pr-2 font-mono text-[10px] text-slate-500">{r.zscores?.z_tbu ?? '—'}</td>
-                        <td className="py-2 pr-2 font-mono text-[10px] text-slate-500">{r.zscores?.z_bbtb ?? '—'}</td>
-                        <td className="py-2">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${classColor(r.kategori_gizi)}`}>
-                            {r.kategori_gizi?.split('(')[0].trim() || '—'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {trainingData.records.length > 10 && (
-                  <p className="text-[10px] text-slate-400 font-medium mt-3 text-center">
-                    ... dan {trainingData.total - 10} rekaman lainnya
-                  </p>
-                )}
+              <div className="space-y-8">
+                {/* Tabel Data Utama */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                      Data Utama (Preview)
+                    </h4>
+                    <span className="text-[10px] font-black text-slate-400 px-2 py-0.5 bg-slate-100 rounded-full">
+                      {trainingData.total} Data Utama
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto border border-slate-100 rounded-2xl">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-100">
+                        <tr>
+                          {['Nama', 'Status', 'Umur', 'BB', 'TB', 'Z BB/U', 'Z TB/U', 'Z BB/TB', 'Kelas'].map((h, i) => (
+                            <th key={i} className="py-2.5 px-3 font-black uppercase tracking-wide text-slate-400 text-[10px]">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {trainingData.records.slice(0, 10).map((r) => (
+                          <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="py-2 px-3 font-semibold text-slate-700 max-w-[120px] truncate">{r.nama || '—'}</td>
+                            <td className="py-2 px-3">
+                              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-blue-50 text-blue-600">
+                                {r.status_data}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-slate-600">{r.umur_bulan} bln</td>
+                            <td className="py-2 px-3 text-slate-600">{r.berat_badan} kg</td>
+                            <td className="py-2 px-3 text-slate-600">{r.tinggi_badan} cm</td>
+                            <td className="py-2 px-3 font-mono text-[10px] text-slate-500">{r.zscores?.z_bbu ?? '—'}</td>
+                            <td className="py-2 px-3 font-mono text-[10px] text-slate-500">{r.zscores?.z_tbu ?? '—'}</td>
+                            <td className="py-2 px-3 font-mono text-[10px] text-slate-500">{r.zscores?.z_bbtb ?? '—'}</td>
+                            <td className="py-2 px-3">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${classColor(r.kategori_gizi)}`}>
+                                {r.kategori_gizi?.split('(')[0].trim() || '—'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Tabel Data Dummy */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-teal-500" />
+                      Data Dummy (Preview)
+                    </h4>
+                    <span className="text-[10px] font-black text-slate-400 px-2 py-0.5 bg-slate-100 rounded-full">
+                      {trainingData.dummyTotal} Data Dummy
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto border border-slate-100 rounded-2xl">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-100">
+                        <tr>
+                          {['Nama', 'Status', 'Umur', 'BB', 'TB', 'Z BB/U', 'Z TB/U', 'Z BB/TB', 'Kelas'].map((h, i) => (
+                            <th key={i} className="py-2.5 px-3 font-black uppercase tracking-wide text-slate-400 text-[10px]">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {(trainingData.dummyRecords || []).slice(0, 10).map((r) => (
+                          <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="py-2 px-3 font-semibold text-slate-700 max-w-[120px] truncate">{r.nama || '—'}</td>
+                            <td className="py-2 px-3">
+                              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-teal-50 text-teal-600">
+                                {r.status_data}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-slate-600">{r.umur_bulan} bln</td>
+                            <td className="py-2 px-3 text-slate-600">{r.berat_badan} kg</td>
+                            <td className="py-2 px-3 text-slate-600">{r.tinggi_badan} cm</td>
+                            <td className="py-2 px-3 font-mono text-[10px] text-slate-500">{r.zscores?.z_bbu ?? '—'}</td>
+                            <td className="py-2 px-3 font-mono text-[10px] text-slate-500">{r.zscores?.z_tbu ?? '—'}</td>
+                            <td className="py-2 px-3 font-mono text-[10px] text-slate-500">{r.zscores?.z_bbtb ?? '—'}</td>
+                            <td className="py-2 px-3">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${classColor(r.kategori_gizi)}`}>
+                                {r.kategori_gizi?.split('(')[0].trim() || '—'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                        {(!trainingData.dummyRecords || trainingData.dummyRecords.length === 0) && (
+                          <tr>
+                            <td colSpan={9} className="py-8 text-center text-slate-400 font-bold text-xs">
+                              Tidak ada data dummy untuk ditampilkan.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </SectionCard>
           )}
@@ -635,6 +801,145 @@ const NaiveBayesTrain = () => {
           )}
         </div>
       </div>
+
+      {/* Full Data Preview Modal */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-5xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-slate-100 animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div>
+                <h3 className="font-black text-slate-900 text-lg flex items-center gap-2">
+                  <Table2 className="text-violet-600" size={20} />
+                  Semua Data Latih (Debugging View)
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">Gunakan tab di bawah untuk melihat detail data latih utama dan dummy</p>
+              </div>
+              <button 
+                onClick={() => setModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-100 p-2.5 rounded-full transition-all border border-slate-200 shadow-sm"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-8 flex flex-col flex-grow overflow-hidden">
+              {/* Tab & Search */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex bg-slate-100 p-1 rounded-2xl">
+                    <button
+                      onClick={() => setModalTab('main')}
+                      className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${
+                        modalTab === 'main' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Data Utama ({trainingData?.records?.length || 0})
+                    </button>
+                    <button
+                      onClick={() => setModalTab('dummy')}
+                      className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${
+                        modalTab === 'dummy' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Data Dummy ({trainingData?.dummyRecords?.length || 0})
+                    </button>
+                  </div>
+
+                  {/* Export Buttons */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const targetData = modalTab === 'main' ? trainingData?.records : trainingData?.dummyRecords;
+                        const filename = `data_latih_${modalTab}_${new Date().toISOString().slice(0, 10)}.csv`;
+                        downloadCSV(targetData, filename);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-100 hover:border-emerald-200 rounded-2xl font-black text-[10px] uppercase tracking-wider transition-all shadow-sm"
+                    >
+                      Unduh CSV
+                    </button>
+                    <button
+                      onClick={() => {
+                        const targetData = modalTab === 'main' ? trainingData?.records : trainingData?.dummyRecords;
+                        const filename = `data_latih_${modalTab}_${new Date().toISOString().slice(0, 10)}.xls`;
+                        downloadExcelXLS(targetData, filename);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-100 hover:border-blue-200 rounded-2xl font-black text-[10px] uppercase tracking-wider transition-all shadow-sm"
+                    >
+                      Unduh Excel (XLS)
+                    </button>
+                  </div>
+                </div>
+                
+                <input
+                  type="text"
+                  placeholder="Cari berdasarkan nama..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="border border-slate-200 rounded-2xl px-4 py-2.5 text-xs font-medium text-slate-700 w-full md:max-w-xs focus:outline-none focus:ring-2 focus:ring-violet-300"
+                />
+              </div>
+
+              {/* Table wrapper */}
+              <div className="flex-grow overflow-y-auto border border-slate-100 rounded-2xl custom-scrollbar">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 z-10">
+                    <tr>
+                      {['ID', 'Nama', 'JK', 'Umur', 'BB', 'TB', 'Z BB/U', 'Z TB/U', 'Z BB/TB', 'Kelas', 'Status'].map((h, i) => (
+                        <th key={i} className="py-3 px-4 font-black uppercase tracking-wide text-slate-500 text-[10px]">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {(modalTab === 'main' ? trainingData?.records : trainingData?.dummyRecords)
+                      ?.filter(r => r.nama?.toLowerCase().includes(searchQuery.toLowerCase()))
+                      ?.map((r) => (
+                        <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-3 px-4 font-mono font-bold text-slate-400">#{r.id}</td>
+                          <td className="py-3 px-4 font-semibold text-slate-700">{r.nama || '—'}</td>
+                          <td className="py-3 px-4">
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${
+                              r.jenis_kelamin === 'P' ? 'bg-pink-100 text-pink-700' : 'bg-blue-100 text-blue-700'
+                            }`}>
+                              {r.jenis_kelamin || 'L'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-slate-600">{r.umur_bulan} bln</td>
+                          <td className="py-3 px-4 text-slate-600">{r.berat_badan} kg</td>
+                          <td className="py-3 px-4 text-slate-600">{r.tinggi_badan} cm</td>
+                          <td className="py-3 px-4 font-mono text-[10px] text-slate-500">{r.zscores?.z_bbu ?? '—'}</td>
+                          <td className="py-3 px-4 font-mono text-[10px] text-slate-500">{r.zscores?.z_tbu ?? '—'}</td>
+                          <td className="py-3 px-4 font-mono text-[10px] text-slate-500">{r.zscores?.z_bbtb ?? '—'}</td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${classColor(r.kategori_gizi)}`}>
+                              {r.kategori_gizi || '—'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${
+                              r.status_data === 'Dummy' ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'
+                            }`}>
+                              {r.status_data}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    {((modalTab === 'main' ? trainingData?.records : trainingData?.dummyRecords)
+                      ?.filter(r => r.nama?.toLowerCase().includes(searchQuery.toLowerCase()))?.length === 0) && (
+                      <tr>
+                        <td colSpan={11} className="py-8 text-center text-slate-400 font-bold text-sm">Tidak ada data ditemukan</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

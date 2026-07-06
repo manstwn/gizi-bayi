@@ -240,6 +240,11 @@ exports.getTrainingData = async (req, res) => {
     });
 
     const dummyCount = await DummyData.count();
+    const dummyRows = await DummyData.findAll({
+      attributes: ['id', 'umur_bulan', 'berat_badan', 'tinggi_badan', 'kategori_gizi', 'jenis_kelamin', 'created_at'],
+      order: [['created_at', 'DESC']],
+      limit: 200,
+    });
 
     // Include Z-scores in preview
     const preview = records.map((r) => {
@@ -267,12 +272,45 @@ exports.getTrainingData = async (req, res) => {
         berat_badan:          r.berat_badan,
         tinggi_badan:         r.tinggi_badan,
         kategori_gizi:        r.kategori_gizi,
+        jenis_kelamin:        r.balita?.jenis_kelamin || 'L',
         tanggal_pemeriksaan:  r.tanggal_pemeriksaan,
         zscores,
+        status_data:          'Utama',
       };
     });
 
-    res.json({ total: records.length, dummyTotal: dummyCount, records: preview });
+    const dummyPreview = dummyRows.map((r) => {
+      let zscores = null;
+      try {
+        const assessment = nutritionalStatusService.assess(
+          r.berat_badan,
+          r.tinggi_badan,
+          r.umur_bulan,
+          r.jenis_kelamin || 'L'
+        );
+        zscores = {
+          z_bbu:  parseFloat(assessment.indices.bbu.z.toFixed(3)),
+          z_tbu:  parseFloat(assessment.indices.tbu.z.toFixed(3)),
+          z_bbtb: parseFloat(assessment.indices.bbtb.z.toFixed(3)),
+        };
+      } catch {
+        zscores = null;
+      }
+
+      return {
+        id:             r.id,
+        nama:           `Dummy #${r.id}`,
+        umur_bulan:     r.umur_bulan,
+        berat_badan:    r.berat_badan,
+        tinggi_badan:   r.tinggi_badan,
+        kategori_gizi:  r.kategori_gizi,
+        jenis_kelamin:  r.jenis_kelamin || 'L',
+        zscores,
+        status_data:    'Dummy',
+      };
+    });
+
+    res.json({ total: records.length, dummyTotal: dummyCount, records: preview, dummyRecords: dummyPreview });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
