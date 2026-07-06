@@ -1,25 +1,31 @@
 /**
- * Gaussian Naive Bayes Service
+ * Categorical Naive Bayes Service
  *
- * Uses WHO Z-score features (BB/U, TB/U, BB/TB) for nutritional status
+ * Uses WHO Z-score categories (BB/U, TB/U, BB/TB) for nutritional status
  * classification. 4 canonical output classes. Includes stratified 80/20
  * train-test split and full evaluation metrics (confusion matrix, precision,
- * recall, F1).
+ * recall, F1) using Laplace Smoothing.
  */
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CLASSES = ['Gizi Buruk', 'Gizi Kurang', 'Gizi Baik', 'Gizi Lebih'];
 
-const FEATURE_KEYS = ['z_bbu', 'z_tbu', 'z_bbtb'];
+const FEATURE_KEYS = ['bbu', 'tbu', 'bbtb'];
 
-const FEATURE_LABELS = {
-  z_bbu:  'Z-score BB/U (Berat Badan per Umur)',
-  z_tbu:  'Z-score TB/U (Tinggi Badan per Umur)',
-  z_bbtb: 'Z-score BB/TB atau BB/PB (Berat Badan menurut Tinggi/Panjang)',
+const FEATURE_DOMAINS = {
+  bbu: ['Sangat Kurang', 'Kurang', 'Normal', 'Badan Lebih'],
+  tbu: ['Sangat Pendek', 'Pendek', 'Normal', 'Tinggi'],
+  bbtb: ['Gizi Buruk', 'Gizi Kurang', 'Normal', 'Gizi Lebih']
 };
 
-// ─── Class Normalisation ─────────────────────────────────────────────────────
+const FEATURE_LABELS = {
+  bbu:  'Kategori BB/U (Berat Badan per Umur)',
+  tbu:  'Kategori TB/U (Tinggi Badan per Umur)',
+  bbtb: 'Kategori BB/TB atau BB/PB (Berat Badan menurut Tinggi/Panjang)',
+};
+
+// ─── Class & Feature Normalisation ───────────────────────────────────────────
 
 /**
  * Map any label (including old 6-class labels) to one of 4 canonical classes.
@@ -37,41 +43,37 @@ function normalizeClass(label) {
   return 'Gizi Baik';
 }
 
-// ─── Statistics Helpers ───────────────────────────────────────────────────────
-
 /**
- * Compute mean and variance of a numeric array.
- * Returns { mean, variance }.  variance floored at 1e-6 to prevent /0.
+ * Normalise raw feature category strings to standard domain keys.
  */
-function meanVariance(arr) {
-  const n = arr.length;
-  if (n === 0) return { mean: 0, variance: 1 };
-  const mean = arr.reduce((s, v) => s + v, 0) / n;
-  const variance = Math.max(
-    arr.reduce((s, v) => s + (v - mean) ** 2, 0) / n,
-    1e-6
-  );
-  return { mean, variance };
-}
-
-/**
- * Gaussian probability density function.
- * P(x | μ, σ²) = 1/√(2πσ²) · exp(-(x-μ)²/(2σ²))
- */
-function gaussianPDF(x, mean, variance) {
-  const v = variance || 1e-6;
-  return (
-    (1 / Math.sqrt(2 * Math.PI * v)) *
-    Math.exp(-((x - mean) ** 2) / (2 * v))
-  );
+function normalizeFeature(fKey, val) {
+  if (!val) return 'Normal';
+  const v = val.toLowerCase().trim();
+  if (fKey === 'bbu') {
+    if (v.includes('sangat kurang')) return 'Sangat Kurang';
+    if (v.includes('kurang')) return 'Kurang';
+    if (v.includes('lebih')) return 'Badan Lebih';
+    return 'Normal';
+  }
+  if (fKey === 'tbu') {
+    if (v.includes('sangat pendek')) return 'Sangat Pendek';
+    if (v.includes('pendek')) return 'Pendek';
+    if (v.includes('tinggi')) return 'Tinggi';
+    return 'Normal';
+  }
+  if (fKey === 'bbtb') {
+    if (v.includes('buruk')) return 'Gizi Buruk';
+    if (v.includes('kurang')) return 'Gizi Kurang';
+    if (v.includes('lebih')) return 'Gizi Lebih';
+    return 'Normal';
+  }
+  return val;
 }
 
 // ─── Stratified Split ─────────────────────────────────────────────────────────
 
 /**
- * Stratified train-test split.  Ensures every class is represented in both sets.
- * @param {Array}  records   - objects with { kategori_gizi, ... }
- * @param {number} testRatio - fraction for test set (default 0.2)
+ * Stratified train-test split. Ensures every class is represented in both sets.
  */
 function stratifiedSplit(records, testRatio = 0.2) {
   const byClass = {};
@@ -86,7 +88,6 @@ function stratifiedSplit(records, testRatio = 0.2) {
 
   Object.values(byClass).forEach((classRecords) => {
     const shuffled = [...classRecords].sort(() => Math.random() - 0.5);
-    // Guarantee at least 1 sample in test for any class that has ≥ 2 samples
     const nTest = classRecords.length >= 2
       ? Math.max(1, Math.round(shuffled.length * testRatio))
       : 0;
@@ -101,12 +102,8 @@ function stratifiedSplit(records, testRatio = 0.2) {
 
 /**
  * Compute confusion matrix + per-class precision, recall, F1.
- * @param {string[]} predictions
- * @param {string[]} actuals
- * @param {string[]} classes
  */
 function computeMetrics(predictions, actuals, classes) {
-  // matrix[actual][predicted] = count
   const matrix = {};
   classes.forEach((a) => {
     matrix[a] = {};
@@ -151,11 +148,10 @@ function computeMetrics(predictions, actuals, classes) {
 // ─── Training ─────────────────────────────────────────────────────────────────
 
 /**
- * Train a Gaussian Naive Bayes model.
+ * Train a Categorical Naive Bayes model using Laplace Smoothing.
  *
  * @param {Array} records - each record must contain:
- *   { z_bbu, z_tbu, z_bbtb, kategori_gizi }
- *   (z-scores are computed by the controller before calling this function)
+ *   { bbu, tbu, bbtb, kategori_gizi }
  * @returns {Object} model - stored as JSON in the database
  */
 function trainModel(records) {
@@ -163,22 +159,28 @@ function trainModel(records) {
     throw new Error('Tidak ada data untuk melatih model.');
   }
 
-  // 1. Normalize class labels (handles legacy 6-class labels)
+  // 1. Normalize and standardise training data
   const normalized = records
-    .map((r) => ({ ...r, kategori_gizi: normalizeClass(r.kategori_gizi) }))
-    .filter((r) => r.z_bbu != null && r.z_tbu != null && r.z_bbtb != null);
+    .map((r) => ({
+      ...r,
+      kategori_gizi: normalizeClass(r.kategori_gizi),
+      bbu: normalizeFeature('bbu', r.bbu),
+      tbu: normalizeFeature('tbu', r.tbu),
+      bbtb: normalizeFeature('bbtb', r.bbtb),
+    }))
+    .filter((r) => r.bbu && r.tbu && r.bbtb);
 
   if (normalized.length === 0) {
-    throw new Error('Tidak ada record dengan Z-score yang valid.');
+    throw new Error('Tidak ada record dengan kategori Z-score yang valid.');
   }
 
   // 2. Stratified 80/20 split
   const { train, test } = stratifiedSplit(normalized, 0.2);
 
-  // 3. Active classes (only classes with ≥ 1 training record)
+  // 3. Active classes
   const activeClasses = [...new Set(train.map((r) => r.kategori_gizi))].sort();
 
-  // 4. Class counts and priors (from training set)
+  // 4. Class counts and priors
   const classCounts = {};
   activeClasses.forEach((c) => { classCounts[c] = 0; });
   train.forEach((r) => { if (classCounts[r.kategori_gizi] !== undefined) classCounts[r.kategori_gizi]++; });
@@ -189,23 +191,31 @@ function trainModel(records) {
     priors[c] = classCounts[c] / totalTrain;
   });
 
-  // 5. Gaussian parameters: mean & variance per class per feature
-  const gaussianParams = {};
+  // 5. Likelihoods with Laplace Smoothing
+  const likelihoods = {};
   activeClasses.forEach((cls) => {
-    gaussianParams[cls] = {};
+    likelihoods[cls] = {};
     const classRecords = train.filter((r) => r.kategori_gizi === cls);
+    const totalClassCount = classRecords.length;
+
     FEATURE_KEYS.forEach((fKey) => {
-      const values = classRecords
-        .map((r) => r[fKey])
-        .filter((v) => v != null && !isNaN(v));
-      gaussianParams[cls][fKey] = meanVariance(values);
+      likelihoods[cls][fKey] = {};
+      const domain = FEATURE_DOMAINS[fKey];
+      const k = domain.length; // 4
+
+      domain.forEach((val) => {
+        const matchCount = classRecords.filter((r) => r[fKey] === val).length;
+        // Laplace Smoothing: (n_ic + 1) / (n_c + k)
+        const prob = (matchCount + 1) / (totalClassCount + k);
+        likelihoods[cls][fKey][val] = parseFloat(prob.toFixed(6));
+      });
     });
   });
 
   // 6. Evaluate on test set
-  const modelSoFar = { priors, gaussianParams, activeClasses };
+  const modelSoFar = { priors, likelihoods, activeClasses };
   const testPredictions = test.map((r) =>
-    predictFromModel(modelSoFar, r.z_bbu, r.z_tbu, r.z_bbtb).predicted_class
+    predictFromModel(modelSoFar, r.bbu, r.tbu, r.bbtb).predicted_class
   );
   const testActuals = test.map((r) => r.kategori_gizi);
 
@@ -219,10 +229,11 @@ function trainModel(records) {
   return {
     // Model parameters
     priors,
-    gaussianParams,
+    likelihoods,
     activeClasses,
     featureKeys: FEATURE_KEYS,
     featureLabels: FEATURE_LABELS,
+    featureDomains: FEATURE_DOMAINS,
 
     // Data stats
     totalRecords: normalized.length,
@@ -241,18 +252,23 @@ function trainModel(records) {
 // ─── Prediction ───────────────────────────────────────────────────────────────
 
 /**
- * Predict nutritional status using a saved Gaussian NB model.
+ * Predict nutritional status using a saved Categorical NB model.
  *
- * @param {Object} model     - model object (as stored / retrieved from DB)
- * @param {number} z_bbu     - Z-score BB/U
- * @param {number} z_tbu     - Z-score TB/U
- * @param {number} z_bbtb    - Z-score BB/TB
- * @returns {Object} prediction result with steps and probabilities
+ * @param {Object} model - model object (as stored / retrieved from DB)
+ * @param {string} bbu   - category BB/U
+ * @param {string} tbu   - category TB/U
+ * @param {string} bbtb  - category BB/TB
  */
-function predictFromModel(model, z_bbu, z_tbu, z_bbtb) {
-  const { priors, gaussianParams, activeClasses } = model;
+function predictFromModel(model, bbu, tbu, bbtb) {
+  const { priors, likelihoods, activeClasses } = model;
 
-  const inputs = { z_bbu, z_tbu, z_bbtb };
+  const rawInputs = { bbu, tbu, bbtb };
+  const inputs = {
+    bbu: normalizeFeature('bbu', bbu),
+    tbu: normalizeFeature('tbu', tbu),
+    bbtb: normalizeFeature('bbtb', bbtb)
+  };
+
   const steps  = [];
   const scores = {};
 
@@ -262,16 +278,17 @@ function predictFromModel(model, z_bbu, z_tbu, z_bbtb) {
     const featureProbs = {};
 
     FEATURE_KEYS.forEach((fKey) => {
-      const params = gaussianParams[cls]?.[fKey] || { mean: 0, variance: 1 };
-      const x      = inputs[fKey];
-      const prob   = gaussianPDF(x, params.mean, params.variance);
-      const safeP  = Math.max(prob, 1e-300);
+      const val = inputs[fKey];
+      let prob = likelihoods[cls]?.[fKey]?.[val];
+      if (prob === undefined) {
+        const domain = FEATURE_DOMAINS[fKey];
+        prob = 1 / (domain.length);
+      }
+      
+      const safeP = Math.max(prob, 1e-300);
 
       featureProbs[fKey] = {
-        value:       x,
-        mean:        parseFloat(params.mean.toFixed(4)),
-        variance:    parseFloat(params.variance.toFixed(4)),
-        stddev:      parseFloat(Math.sqrt(params.variance).toFixed(4)),
+        value:       val,
         probability: prob,
       };
       logScore += Math.log(safeP);
@@ -301,7 +318,7 @@ function predictFromModel(model, z_bbu, z_tbu, z_bbtb) {
     predicted_class: predictedClass,
     probabilities,
     scores,
-    inputs,
+    inputs: rawInputs,
     steps,
     confidence: probabilities[predictedClass],
   };
@@ -313,7 +330,9 @@ module.exports = {
   trainModel,
   predictFromModel,
   normalizeClass,
+  normalizeFeature,
   CLASSES,
   FEATURE_KEYS,
+  FEATURE_DOMAINS,
   FEATURE_LABELS,
 };

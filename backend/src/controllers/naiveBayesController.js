@@ -13,6 +13,25 @@ const nutritionalStatusService = require('../services/nutritionalStatusService')
  */
 function enrichWithZScores(records) {
   const enriched = [];
+  const bbuMap = {
+    'Berat badan sangat kurang': 'Sangat Kurang',
+    'Berat badan kurang': 'Kurang',
+    'Berat badan normal': 'Normal',
+    'Risiko berat badan lebih': 'Badan Lebih'
+  };
+  const tbuMap = {
+    'Sangat pendek': 'Sangat Pendek',
+    'Pendek': 'Pendek',
+    'Normal': 'Normal',
+    'Tinggi': 'Tinggi'
+  };
+  const bbtbMap = {
+    'Gizi buruk': 'Gizi Buruk',
+    'Gizi kurang': 'Gizi Kurang',
+    'Gizi baik': 'Normal',
+    'Gizi lebih': 'Gizi Lebih'
+  };
+
   for (const r of records) {
     try {
       const assessment = nutritionalStatusService.assess(
@@ -21,11 +40,17 @@ function enrichWithZScores(records) {
         parseInt(r.umur_bulan),
         r.jenis_kelamin || 'L'
       );
+      
+      const bbu = bbuMap[assessment.indices.bbu.category] || assessment.indices.bbu.category;
+      const tbu = tbuMap[assessment.indices.tbu.category] || assessment.indices.tbu.category;
+      const bbtb = bbtbMap[assessment.indices.bbtb.category] || assessment.indices.bbtb.category;
+
       enriched.push({
         ...r,
-        z_bbu:  assessment.indices.bbu.z,
-        z_tbu:  assessment.indices.tbu.z,
-        z_bbtb: assessment.indices.bbtb.z,
+        bbu,
+        tbu,
+        bbtb,
+        kategori_gizi: assessment.summary.status, // Dinamis menggunakan keputusan new-data.csv
       });
     } catch {
       // Skip records that fail assessment
@@ -190,8 +215,31 @@ exports.predict = async (req, res) => {
     const z_tbu  = assessment.indices.tbu.z;
     const z_bbtb = assessment.indices.bbtb.z;
 
+    const bbuMap = {
+      'Berat badan sangat kurang': 'Sangat Kurang',
+      'Berat badan kurang': 'Kurang',
+      'Berat badan normal': 'Normal',
+      'Risiko berat badan lebih': 'Badan Lebih'
+    };
+    const tbuMap = {
+      'Sangat pendek': 'Sangat Pendek',
+      'Pendek': 'Pendek',
+      'Normal': 'Normal',
+      'Tinggi': 'Tinggi'
+    };
+    const bbtbMap = {
+      'Gizi buruk': 'Gizi Buruk',
+      'Gizi kurang': 'Gizi Kurang',
+      'Gizi baik': 'Normal',
+      'Gizi lebih': 'Gizi Lebih'
+    };
+
+    const bbuCategory = bbuMap[assessment.indices.bbu.category] || assessment.indices.bbu.category;
+    const tbuCategory = tbuMap[assessment.indices.tbu.category] || assessment.indices.tbu.category;
+    const bbtbCategory = bbtbMap[assessment.indices.bbtb.category] || assessment.indices.bbtb.category;
+
     const modelData = savedModel.model_json;
-    const result = nbService.predictFromModel(modelData, z_bbu, z_tbu, z_bbtb);
+    const result = nbService.predictFromModel(modelData, bbuCategory, tbuCategory, bbtbCategory);
 
     res.json({
       model_id:   savedModel.id,
@@ -249,6 +297,7 @@ exports.getTrainingData = async (req, res) => {
     // Include Z-scores in preview
     const preview = records.map((r) => {
       let zscores = null;
+      let kategori_gizi = r.kategori_gizi;
       try {
         const assessment = nutritionalStatusService.assess(
           r.berat_badan,
@@ -261,6 +310,7 @@ exports.getTrainingData = async (req, res) => {
           z_tbu:  parseFloat(assessment.indices.tbu.z.toFixed(3)),
           z_bbtb: parseFloat(assessment.indices.bbtb.z.toFixed(3)),
         };
+        kategori_gizi = assessment.summary.status; // Dinamis menggunakan keputusan new-data.csv
       } catch {
         zscores = null;
       }
@@ -271,7 +321,7 @@ exports.getTrainingData = async (req, res) => {
         umur_bulan:           r.umur_bulan,
         berat_badan:          r.berat_badan,
         tinggi_badan:         r.tinggi_badan,
-        kategori_gizi:        r.kategori_gizi,
+        kategori_gizi,
         jenis_kelamin:        r.balita?.jenis_kelamin || 'L',
         tanggal_pemeriksaan:  r.tanggal_pemeriksaan,
         zscores,
@@ -281,6 +331,7 @@ exports.getTrainingData = async (req, res) => {
 
     const dummyPreview = dummyRows.map((r) => {
       let zscores = null;
+      let kategori_gizi = r.kategori_gizi;
       try {
         const assessment = nutritionalStatusService.assess(
           r.berat_badan,
@@ -293,6 +344,7 @@ exports.getTrainingData = async (req, res) => {
           z_tbu:  parseFloat(assessment.indices.tbu.z.toFixed(3)),
           z_bbtb: parseFloat(assessment.indices.bbtb.z.toFixed(3)),
         };
+        kategori_gizi = assessment.summary.status; // Dinamis menggunakan keputusan new-data.csv
       } catch {
         zscores = null;
       }
@@ -303,7 +355,7 @@ exports.getTrainingData = async (req, res) => {
         umur_bulan:     r.umur_bulan,
         berat_badan:    r.berat_badan,
         tinggi_badan:   r.tinggi_badan,
-        kategori_gizi:  r.kategori_gizi,
+        kategori_gizi,
         jenis_kelamin:  r.jenis_kelamin || 'L',
         zscores,
         status_data:    'Dummy',

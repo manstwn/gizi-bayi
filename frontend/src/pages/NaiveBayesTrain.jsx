@@ -416,12 +416,12 @@ const NaiveBayesTrain = () => {
           <div className="bg-violet-600 p-2 rounded-2xl shadow-lg shadow-violet-100">
             <Brain className="text-white" size={32} />
           </div>
-          Gaussian Naive Bayes
+          Categorical Naive Bayes
           <span className="text-xs bg-violet-900 text-white px-3 py-1 rounded-full font-black uppercase tracking-widest">Training</span>
         </h1>
         <p className="text-slate-500 mt-2 text-sm font-semibold max-w-xl">
-          Latih model Gaussian NB menggunakan fitur{' '}
-          <span className="text-violet-600">Z-score WHO (BB/U, TB/U, BB/TB)</span>.
+          Latih model Categorical NB menggunakan kategori{' '}
+          <span className="text-violet-600">Z-score WHO (BB/U, TB/U, BB/TB)</span> dengan Laplace Smoothing.
           Akurasi dievaluasi pada test set terpisah (80/20 stratified split).
         </p>
       </div>
@@ -513,7 +513,7 @@ const NaiveBayesTrain = () => {
               <div className="flex items-start gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl">
                 <CheckCircle2 size={18} className="text-emerald-500 mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="text-emerald-700 text-xs font-black">Model Gaussian NB berhasil dilatih!</p>
+                  <p className="text-emerald-700 text-xs font-black">Model Categorical NB berhasil dilatih!</p>
                   <p className="text-emerald-600 text-xs mt-1">
                     {trainResult.trainCount} train · {trainResult.testCount} test
                     {trainResult.mainCount != null && ` (${trainResult.mainCount} utama + ${trainResult.dummyCount} dummy)`}
@@ -761,49 +761,63 @@ const NaiveBayesTrain = () => {
                 </div>
               </SectionCard>
 
-              {/* Gaussian Parameters */}
-              <Collapsible title="Parameter Gaussian P(x | Kelas) — Mean & Standar Deviasi" defaultOpen={true}>
-                <p className="text-[10px] text-slate-400 font-medium mb-4 flex items-center gap-1">
-                  <Sigma size={10} /> P(x|C) = (1/√(2πσ²)) · exp(−(x−μ)² / (2σ²))
+              {/* Likelihood Parameters (Categorical Naive Bayes) */}
+              <Collapsible title="Parameter Likelihood P(x | Kelas) — Dengan Laplace Smoothing" defaultOpen={true}>
+                <p className="text-[10px] text-slate-400 font-medium mb-6 flex items-center gap-1">
+                  <Sigma size={10} /> P(X_i = v | C) = (n_ic + 1) / (n_c + k)
                 </p>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-100">
-                        <th className="pb-3 text-[10px] font-black text-slate-400 uppercase pr-4">Kelas</th>
-                        {(displayModel.featureKeys || ['z_bbu', 'z_tbu', 'z_bbtb']).map((fKey) => (
-                          <th key={fKey} className="pb-3 text-[10px] font-black text-slate-500 uppercase text-center px-3">
-                            {featureLabels[fKey] || fKey}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {displayModel.activeClasses.map((cls) => (
-                        <tr key={cls} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-3 pr-4">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${classColor(cls)}`}>{cls}</span>
-                          </td>
-                          {(displayModel.featureKeys || ['z_bbu', 'z_tbu', 'z_bbtb']).map((fKey) => {
-                            const params = displayModel.gaussianParams?.[cls]?.[fKey];
-                            return (
-                              <td key={fKey} className="py-3 text-center">
-                                {params ? (
-                                  <div>
-                                    <div className="font-black text-slate-800 text-xs">μ = {params.mean.toFixed(3)}</div>
-                                    <div className="text-[9px] text-slate-400 mt-0.5">σ = {Math.sqrt(params.variance).toFixed(3)}</div>
-                                  </div>
-                                ) : '—'}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                
+                <div className="space-y-6">
+                  {['bbu', 'tbu', 'bbtb'].map((fKey) => {
+                    const label = featureLabels[fKey] || fKey;
+                    const domain = (displayModel.featureDomains?.[fKey] || {
+                      bbu: ['Sangat Kurang', 'Kurang', 'Normal', 'Badan Lebih'],
+                      tbu: ['Sangat Pendek', 'Pendek', 'Normal', 'Tinggi'],
+                      bbtb: ['Gizi Buruk', 'Gizi Kurang', 'Normal', 'Gizi Lebih']
+                    }[fKey]) || [];
+
+                    return (
+                      <div key={fKey} className="space-y-3">
+                        <h4 className="font-black text-slate-700 text-xs uppercase tracking-wider border-l-4 border-violet-500 pl-2">
+                          Likelihood {label}
+                        </h4>
+                        <div className="overflow-x-auto border border-slate-100 rounded-2xl">
+                          <table className="w-full text-left text-xs border-collapse">
+                            <thead className="bg-slate-50 border-b border-slate-100">
+                              <tr>
+                                <th className="py-3 px-4 font-black text-slate-400 uppercase tracking-wider text-[10px]">Kategori</th>
+                                {displayModel.activeClasses.map((cls) => (
+                                  <th key={cls} className="py-3 px-4 text-center">
+                                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${classColor(cls)}`}>
+                                      {cls}
+                                    </span>
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                              {domain.map((val) => (
+                                <tr key={val} className="hover:bg-slate-50/50 transition-colors">
+                                  <td className="py-3 px-4 font-semibold text-slate-700">{val}</td>
+                                  {displayModel.activeClasses.map((cls) => {
+                                    const prob = displayModel.likelihoods?.[cls]?.[fKey]?.[val];
+                                    return (
+                                      <td key={cls} className="py-3 px-4 text-center font-mono font-bold text-slate-700">
+                                        {prob != null ? prob.toFixed(4) : '0.0000'}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <p className="text-[10px] text-slate-400 mt-3 font-medium">
-                  μ = rata-rata fitur per kelas &nbsp;·&nbsp; σ = standar deviasi
+                <p className="text-[10px] text-slate-400 mt-4 font-medium">
+                  n_ic = jumlah kemunculan kategori dalam kelas &nbsp;·&nbsp; n_c = total data kelas &nbsp;·&nbsp; k = jumlah kategori unik (k=4)
                 </p>
               </Collapsible>
 

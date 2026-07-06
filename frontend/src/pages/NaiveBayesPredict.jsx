@@ -119,9 +119,9 @@ const FormulaRow = ({ cls, step, isPredicted }) => {
     return p < 1e-6 ? p.toExponential(3) : p.toFixed(6);
   };
   const featureShort = {
-    z_bbu:  'BB/U',
-    z_tbu:  'TB/U',
-    z_bbtb: 'BB/TB',
+    bbu:  'BB/U',
+    tbu:  'TB/U',
+    bbtb: 'BB/TB',
   };
 
   return (
@@ -146,8 +146,8 @@ const FormulaRow = ({ cls, step, isPredicted }) => {
           <React.Fragment key={fKey}>
             <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
             <div className="bg-white/80 border border-slate-200 rounded-xl px-3 py-1.5 text-center">
-              <p className="text-[9px] text-slate-400 font-bold uppercase">Z {featureShort[fKey] || fKey}</p>
-              <p className="font-mono text-[9px] text-slate-500 mb-0.5">x={fp.value?.toFixed(2)} μ={fp.mean?.toFixed(2)} σ={fp.stddev?.toFixed(2)}</p>
+              <p className="text-[9px] text-slate-400 font-bold uppercase">{featureShort[fKey] || fKey}</p>
+              <p className="font-mono text-[9px] text-slate-500 mb-0.5 font-bold">x = "{fp.value}"</p>
               <p className="font-black text-slate-700">{fmtProb(fp.probability)}</p>
             </div>
           </React.Fragment>
@@ -213,13 +213,13 @@ const NaiveBayesPredict = () => {
           <div className="bg-indigo-600 p-2 rounded-2xl shadow-lg shadow-indigo-100">
             <Sparkles className="text-white" size={32} />
           </div>
-          Gaussian Naive Bayes
+          Categorical Naive Bayes
           <span className="text-xs bg-indigo-900 text-white px-3 py-1 rounded-full font-black uppercase tracking-widest">Prediksi</span>
         </h1>
         <p className="text-slate-500 mt-2 text-sm font-semibold max-w-xl">
-          Klasifikasi status gizi balita menggunakan{' '}
-          <span className="text-indigo-600">Z-score BB/U, TB/U, BB/TB</span>.
-          Langkah perhitungan Gaussian PDF ditampilkan lengkap.
+          Klasifikasi status gizi balita menggunakan kategori{' '}
+          <span className="text-indigo-600">Z-score BB/U, TB/U, BB/TB</span> dengan Laplace Smoothing.
+          Langkah perhitungan Likelihood ditampilkan lengkap.
         </p>
       </div>
 
@@ -322,17 +322,23 @@ const NaiveBayesPredict = () => {
               </h3>
               <div className="space-y-2">
                 {[
-                  ['BB/U',  result.zscores.z_bbu,  'Berat Badan per Umur'],
-                  ['TB/U',  result.zscores.z_tbu,  'Tinggi Badan per Umur'],
-                  ['BB/TB', result.zscores.z_bbtb, 'BB per Tinggi (primer)'],
-                ].map(([label, val, desc]) => {
+                  ['BB/U',  result.zscores.z_bbu,  'bbu',  'Berat Badan per Umur'],
+                  ['TB/U',  result.zscores.z_tbu,  'tbu',  'Tinggi Badan per Umur'],
+                  ['BB/TB', result.zscores.z_bbtb, 'bbtb', 'BB per Tinggi (primer)'],
+                ].map(([label, val, key, desc]) => {
                   const v = parseFloat(val);
                   const color = isNaN(v) ? 'text-slate-400' : v < -3 ? 'text-rose-600' : v < -2 ? 'text-amber-600' : v > 2 ? 'text-orange-600' : 'text-emerald-600';
+                  const cat = result.who_assessment?.indices?.[key]?.category;
                   return (
                     <div key={label} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl">
                       <div>
-                        <span className="text-xs font-black text-slate-700">{label}</span>
-                        <span className="text-[10px] text-slate-400 ml-2">{desc}</span>
+                        <div className="flex items-center">
+                          <span className="text-xs font-black text-slate-700">{label}</span>
+                          <span className="text-[10px] text-slate-400 ml-2">{desc}</span>
+                        </div>
+                        {cat && (
+                          <p className="text-[10px] text-slate-400 font-bold mt-0.5">({cat})</p>
+                        )}
                       </div>
                       <span className={`text-sm font-black font-mono ${color}`}>
                         {isNaN(v) ? '—' : v > 0 ? `+${v.toFixed(3)}` : v.toFixed(3)}
@@ -434,13 +440,13 @@ const NaiveBayesPredict = () => {
                 </div>
               </div>
 
-              {/* Step-by-step Gaussian calculation */}
+              {/* Step-by-step Categorical calculation */}
               <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
                 <h3 className="font-black text-sm text-slate-700 mb-2 flex items-center gap-2">
-                  <Brain size={16} className="text-violet-500" /> Langkah Perhitungan Gaussian Naive Bayes
+                  <Brain size={16} className="text-violet-500" /> Langkah Perhitungan Categorical Naive Bayes
                 </h3>
                 <p className="text-[10px] text-slate-400 font-medium mb-5">
-                  log P(C|X) ∝ log P(C) + Σ log P(z_i | C) &nbsp;·&nbsp; P(x|μ,σ) = (1/√2πσ²) · exp(−(x−μ)²/2σ²)
+                  log P(C|X) ∝ log P(C) + Σ log P(X_i = x_i | C) &nbsp;·&nbsp; P(X_i = v | C) = (n_ic + 1) / (n_c + k) (Laplace Smoothing)
                 </p>
                 <div className="space-y-3">
                   {result.steps.map((step) => (
@@ -454,8 +460,8 @@ const NaiveBayesPredict = () => {
                 </div>
                 <div className="mt-5 p-4 bg-slate-50 rounded-2xl">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Formula</p>
-                  <p className="font-mono text-xs text-slate-600">argmax_C [ log P(C) + Σ log P(z_i | C) ]</p>
-                  <p className="text-[10px] text-slate-400 mt-2">P(z|C) = Gaussian PDF dengan mean & variance per kelas</p>
+                  <p className="font-mono text-xs text-slate-600">argmax_C [ log P(C) + Σ log P(X_i = x_i | C) ]</p>
+                  <p className="text-[10px] text-slate-400 mt-2">P(X_i|C) = Likelihood berdasarkan frekuensi kemunculan kategori dalam data latih kelas C</p>
                 </div>
               </div>
             </>

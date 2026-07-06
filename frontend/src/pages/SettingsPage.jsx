@@ -32,17 +32,26 @@ const SettingsPage = () => {
     }
   };
 
+  const [rules, setRules] = useState([]);
+  const [rulesSearch, setRulesSearch] = useState('');
+  const [rulesPage, setRulesPage] = useState(1);
+  const rulesPerPage = 10;
+
   useEffect(() => {
-    fetchPairData();
+    fetchSettingsData();
   }, []);
 
-  const fetchPairData = async () => {
+  const fetchSettingsData = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/settings/pairs');
-      setPairData(res.data);
+      const [pairRes, rulesRes] = await Promise.all([
+        api.get('/settings/pairs'),
+        api.get('/settings/rules')
+      ]);
+      setPairData(pairRes.data);
+      setRules(rulesRes.data || []);
     } catch (error) {
-      console.error('Error fetching pair data:', error);
+      console.error('Error fetching settings data:', error);
     } finally {
       setLoading(false);
     }
@@ -52,7 +61,7 @@ const SettingsPage = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px]">
         <RefreshCw className="animate-spin text-medical-600 mb-4" size={40} />
-        <p className="text-slate-500 font-medium">Sinkronisasi data @pairs...</p>
+        <p className="text-slate-500 font-medium">Sinkronisasi data @pairs & aturan keputusan...</p>
       </div>
     );
   }
@@ -73,6 +82,18 @@ const SettingsPage = () => {
     </div>
   );
 
+  const filteredRules = rules.filter(r => 
+    (r.bbu?.toLowerCase() || '').includes(rulesSearch.toLowerCase()) ||
+    (r.tbu?.toLowerCase() || '').includes(rulesSearch.toLowerCase()) ||
+    (r.bbtb?.toLowerCase() || '').includes(rulesSearch.toLowerCase()) ||
+    (r.keputusan?.toLowerCase() || '').includes(rulesSearch.toLowerCase())
+  );
+  
+  const totalPages = Math.ceil(filteredRules.length / rulesPerPage);
+  const startIndex = (rulesPage - 1) * rulesPerPage;
+  const endIndex = startIndex + rulesPerPage;
+  const paginatedRules = filteredRules.slice(startIndex, endIndex);
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -84,7 +105,7 @@ const SettingsPage = () => {
           <p className="text-slate-500 mt-2 font-medium">Sistem kini sepenuhnya menggunakan anchor data @pairs (Z-Score Standard WHO).</p>
         </div>
         <button 
-          onClick={fetchPairData}
+          onClick={fetchSettingsData}
           className="bg-white hover:bg-slate-50 text-slate-700 px-6 py-3 rounded-2xl font-bold border border-slate-200 flex items-center space-x-2 transition-all shadow-sm"
         >
           <RefreshCw size={20} />
@@ -120,6 +141,108 @@ const SettingsPage = () => {
             { label: 'Gizi Lebih', range: '> +1 SD', color: 'text-blue-500' }
           ]}
         />
+      </div>
+
+      {/* Decision Rules Card */}
+      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden p-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-6">
+          <div className="flex items-center space-x-4">
+            <div className="bg-violet-600 p-3 rounded-2xl shadow-lg shadow-violet-600/20 text-white">
+              <FileText size={24} />
+            </div>
+            <div>
+              <h3 className="text-slate-900 font-black text-xl">Matriks Keputusan Status Gizi</h3>
+              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">
+                Logika Klasifikasi Kombinasi Z-score (new-data.csv)
+              </p>
+            </div>
+          </div>
+          <div className="w-full sm:max-w-xs">
+            <input
+              type="text"
+              placeholder="Cari aturan (misal: 'Sangat Pendek', 'Gizi Buruk')..."
+              value={rulesSearch}
+              onChange={(e) => {
+                setRulesSearch(e.target.value);
+                setRulesPage(1);
+              }}
+              className="w-full border border-slate-200 rounded-2xl px-4 py-2.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-300"
+            />
+          </div>
+        </div>
+
+        {/* Rules Table */}
+        <div className="overflow-x-auto border border-slate-100 rounded-2xl">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead className="bg-slate-50 border-b border-slate-100">
+              <tr>
+                <th className="px-6 py-4 font-black text-slate-400 uppercase tracking-wider text-[10px] w-20">No</th>
+                <th className="px-6 py-4 font-black text-slate-500 uppercase tracking-wider text-[10px]">BB/U (Berat / Umur)</th>
+                <th className="px-6 py-4 font-black text-slate-500 uppercase tracking-wider text-[10px]">TB/U (Tinggi / Umur)</th>
+                <th className="px-6 py-4 font-black text-slate-500 uppercase tracking-wider text-[10px]">BB/TB (Berat / Tinggi)</th>
+                <th className="px-6 py-4 font-black text-slate-500 uppercase tracking-wider text-[10px] text-center">Keputusan Status Gizi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {paginatedRules.map((rule, index) => {
+                const globalIndex = (rulesPage - 1) * rulesPerPage + index + 1;
+                return (
+                  <tr key={globalIndex} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-6 py-4 font-mono text-slate-400 font-bold">{globalIndex}</td>
+                    <td className="px-6 py-4 font-semibold text-slate-700">{rule.bbu}</td>
+                    <td className="px-6 py-4 font-semibold text-slate-700">{rule.tbu}</td>
+                    <td className="px-6 py-4 font-semibold text-slate-700">{rule.bbtb}</td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-wider uppercase inline-block ${
+                        rule.keputusan === 'Gizi Buruk' ? 'bg-rose-100 text-rose-700 border border-rose-200' :
+                        rule.keputusan === 'Gizi Kurang' ? 'bg-amber-100 text-amber-700 border border-amber-200' :
+                        rule.keputusan === 'Gizi Baik' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
+                        'bg-blue-100 text-blue-700 border border-blue-200'
+                      }`}>
+                        {rule.keputusan}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filteredRules.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-slate-400 font-bold">
+                    Tidak ada aturan keputusan yang cocok dengan pencarian Anda.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-slate-100 pt-5">
+            <span className="text-xs text-slate-400 font-bold">
+              Menampilkan {startIndex + 1}-{Math.min(endIndex, filteredRules.length)} dari {filteredRules.length} aturan
+            </span>
+            <div className="flex items-center space-x-2">
+              <button
+                disabled={rulesPage === 1}
+                onClick={() => setRulesPage(prev => Math.max(prev - 1, 1))}
+                className="px-4 py-2.5 text-xs font-bold border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                Sebelumnya
+              </button>
+              <span className="text-xs text-slate-700 font-black px-2">
+                Halaman {rulesPage} dari {totalPages}
+              </span>
+              <button
+                disabled={rulesPage === totalPages}
+                onClick={() => setRulesPage(prev => Math.min(prev + 1, totalPages))}
+                className="px-4 py-2.5 text-xs font-bold border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                Berikutnya
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="space-y-6">

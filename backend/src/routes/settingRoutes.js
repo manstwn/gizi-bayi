@@ -7,5 +7,6 @@ router.get('/fuzzy', authMiddleware, settingController.getFuzzyParameters);
 router.post('/fuzzy', authMiddleware, roleMiddleware(['admin', 'kader']), settingController.updateFuzzyParameters);
 router.post('/simulate', authMiddleware, settingController.simulateCalculation);
 router.get('/pairs', authMiddleware, settingController.getPairData);
+router.get('/rules', authMiddleware, settingController.getDecisionRules);
 
 module.exports = router;

@@ -1,6 +1,95 @@
+const fs = require('fs');
+const path = require('path');
 const pairDataService = require('./pairDataService');
 
 class NutritionalStatusService {
+  constructor() {
+    this.decisionRules = [];
+    this.loadDecisionRules();
+  }
+
+  /**
+   * Load decision rules from new-data.csv at startup
+   */
+  loadDecisionRules() {
+    try {
+      const csvPath = path.join(__dirname, '../../..', 'new-data.csv');
+      if (fs.existsSync(csvPath)) {
+        const content = fs.readFileSync(csvPath, 'utf8');
+        const lines = content.split('\n').map(line => line.trim()).filter(line => line !== '');
+        
+        // Skip header
+        for (let i = 1; i < lines.length; i++) {
+          const parts = lines[i].split(',').map(p => p.trim());
+          if (parts.length >= 4) {
+            this.decisionRules.push({
+              bbu: parts[0],
+              tbu: parts[1],
+              bbtb: parts[2],
+              keputusan: parts[3]
+            });
+          }
+        }
+        console.log(`Loaded ${this.decisionRules.length} decision rules from new-data.csv.`);
+      } else {
+        console.warn(`Decision rules file not found at: ${csvPath}`);
+      }
+    } catch (error) {
+      console.error('Error loading decision rules in NutritionalStatusService:', error);
+    }
+  }
+
+  /**
+   * Determine final nutritional status based on decision matrix from new-data.csv
+   */
+  getDecision(bbuCategory, tbuCategory, bbtbCategory) {
+    // Map internal categories to CSV categories
+    const bbuMap = {
+      'Berat badan sangat kurang': 'Sangat Kurang',
+      'Berat badan kurang': 'Kurang',
+      'Berat badan normal': 'Normal',
+      'Risiko berat badan lebih': 'Badan Lebih'
+    };
+
+    const tbuMap = {
+      'Sangat pendek': 'Sangat Pendek',
+      'Pendek': 'Pendek',
+      'Normal': 'Normal',
+      'Tinggi': 'Tinggi'
+    };
+
+    const bbtbMap = {
+      'Gizi buruk': 'Gizi Buruk',
+      'Gizi kurang': 'Gizi Kurang',
+      'Gizi baik': 'Normal',
+      'Gizi lebih': 'Gizi Lebih'
+    };
+
+    const targetBbu = bbuMap[bbuCategory] || bbuCategory;
+    const targetTbu = tbuMap[tbuCategory] || tbuCategory;
+    const targetBbtb = bbtbMap[bbtbCategory] || bbtbCategory;
+
+    // Search rule
+    const rule = this.decisionRules.find(r => 
+      r.bbu.toLowerCase() === targetBbu.toLowerCase() &&
+      r.tbu.toLowerCase() === targetTbu.toLowerCase() &&
+      r.bbtb.toLowerCase() === targetBbtb.toLowerCase()
+    );
+
+    if (rule) {
+      return rule.keputusan;
+    }
+
+    // Fallback: Map BB/TB category to standard casing
+    const fallbackMap = {
+      'Gizi buruk': 'Gizi Buruk',
+      'Gizi kurang': 'Gizi Kurang',
+      'Gizi baik': 'Gizi Baik',
+      'Gizi lebih': 'Gizi Lebih'
+    };
+    return fallbackMap[bbtbCategory] || bbtbCategory;
+  }
+
   /**
    * Calculate Z-Score for a given value and reference data
    * @param {number} value - The actual measurement (BB or TB)
@@ -119,14 +208,18 @@ class NutritionalStatusService {
     const refBBTB = pairDataService.getSDValues(gender, type, tb);
     const zBBTB = this.calculateZScore(bb, refBBTB);
 
+    const bbuCategory = this.getBBUCategory(zBBU);
+    const tbuCategory = this.getTBUCategory(zTBU);
+    const bbtbCategory = this.getBBTBCategory(zBBTB);
+
     return {
       indices: {
-        bbu: { z: zBBU, category: this.getBBUCategory(zBBU), ref: refBBU },
-        tbu: { z: zTBU, category: this.getTBUCategory(zTBU), ref: refTBU },
-        bbtb: { z: zBBTB, category: this.getBBTBCategory(zBBTB), ref: refBBTB }
+        bbu: { z: zBBU, category: bbuCategory, ref: refBBU },
+        tbu: { z: zTBU, category: tbuCategory, ref: refTBU },
+        bbtb: { z: zBBTB, category: bbtbCategory, ref: refBBTB }
       },
       summary: {
-        status: this.getBBTBCategory(zBBTB), // Primary indicator
+        status: this.getDecision(bbuCategory, tbuCategory, bbtbCategory),
         stunting: zTBU < -2 ? 'Stunted' : 'Normal',
         wasting: zBBTB < -2 ? 'Wasted' : 'Normal',
         underweight: zBBU < -2 ? 'Underweight' : 'Normal'

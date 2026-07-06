@@ -62,3 +62,12 @@ exports.getPairData = async (req, res) => {
     res.status(500).json({ message: 'Error fetching pair data' });
   }
 };
+
+exports.getDecisionRules = async (req, res) => {
+  try {
+    res.json(NutritionalStatusService.decisionRules);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching decision rules', error: error.message });
+  }
+};
+

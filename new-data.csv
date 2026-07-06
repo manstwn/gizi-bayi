@@ -1,0 +1,65 @@
+BB/U(BeratBadanmenurutUmur),TB/U(TinggiBadanmenurut Umur),BB/TB(BeratBadan menurut Tinggi),Keputusan (Dalam Kurung)
+Normal,Sangat Pendek,Gizi Buruk,Gizi Buruk
+Normal,Pendek,Gizi Buruk,Gizi Buruk
+Normal,Normal,Gizi Buruk,Gizi Buruk
+Normal,Tinggi,Gizi Buruk,Gizi Buruk
+Sangat Kurang,Sangat Pendek,Gizi Buruk,Gizi Buruk
+Kurang,Sangat Pendek,Gizi Buruk,Gizi Buruk
+Badan Lebih,Sangat Pendek,Gizi Buruk,Gizi Buruk
+Sangat Kurang,Pendek,Gizi Buruk,Gizi Buruk
+Kurang,Pendek,Gizi Buruk,Gizi Buruk
+Badan Lebih,Pendek,Gizi Buruk,Gizi Buruk
+Sangat Kurang,Normal,Gizi Buruk,Gizi Buruk
+Kurang,Normal,Gizi Buruk,Gizi Buruk
+Badan Lebih,Normal,Gizi Buruk,Gizi Buruk
+Sangat Kurang,Tinggi,Gizi Buruk,Gizi Buruk
+Kurang,Tinggi,Gizi Buruk,Gizi Buruk
+Badan Lebih,Tinggi,Gizi Buruk,Gizi Buruk
+Normal,Sangat Pendek,Gizi Kurang,Gizi Buruk
+Normal,Pendek,Gizi Kurang,Gizi Kurang
+Normal,Normal,Gizi Kurang,Gizi Kurang
+Normal,Tinggi,Gizi Kurang,Gizi Kurang
+Sangat Kurang,Sangat Pendek,Gizi Kurang,Gizi Buruk
+Kurang,Sangat Pendek,Gizi Kurang,Gizi Buruk
+Badan Lebih,Sangat Pendek,Gizi Kurang,Gizi Buruk
+Sangat Kurang,Pendek,Gizi Kurang,Gizi Buruk
+Kurang,Pendek,Gizi Kurang,Gizi Kurang
+Badan Lebih,Pendek,Gizi Kurang,Gizi Kurang
+Sangat Kurang,Normal,Gizi Kurang,Gizi Buruk
+Kurang,Normal,Gizi Kurang,Gizi Kurang
+Badan Lebih,Normal,Gizi Kurang,Gizi Kurang
+Sangat Kurang,Tinggi,Gizi Kurang,Gizi Buruk
+Kurang,Tinggi,Gizi Kurang,Gizi Kurang
+Badan Lebih,Tinggi,Gizi Kurang,Gizi Kurang
+Normal,Sangat Pendek,Normal,Gizi Kurang
+Normal,Pendek,Normal,Gizi Baik
+Normal,Normal,Normal,Gizi Baik
+Normal,Tinggi,Normal,Gizi Baik
+Sangat Kurang,Sangat Pendek,Normal,Gizi Kurang
+Kurang,Sangat Pendek,Normal,Gizi Kurang
+Badan Lebih,Sangat Pendek,Normal,Gizi Kurang
+Sangat Kurang,Pendek,Normal,Gizi Kurang
+Kurang,Pendek,Normal,Gizi Baik
+Badan Lebih,Pendek,Normal,Gizi Baik
+Sangat Kurang,Normal,Normal,Gizi Kurang
+Kurang,Normal,Normal,Gizi Baik
+Badan Lebih,Normal,Normal,Gizi Baik
+Sangat Kurang,Tinggi,Normal,Gizi Kurang
+Kurang,Tinggi,Normal,Gizi Baik
+Badan Lebih,Tinggi,Normal,Gizi Baik
+Normal,Sangat Pendek,Gizi Lebih,Gizi Lebih
+Normal,Pendek,Gizi Lebih,Gizi Lebih
+Normal,Normal,Gizi Lebih,Gizi Lebih
+Normal,Tinggi,Gizi Lebih,Gizi Lebih
+Sangat Kurang,Sangat Pendek,Gizi Lebih,Gizi Lebih
+Kurang,Sangat Pendek,Gizi Lebih,Gizi Lebih
+Badan Lebih,Sangat Pendek,Gizi Lebih,Gizi Lebih
+Sangat Kurang,Pendek,Gizi Lebih,Gizi Lebih
+Kurang,Pendek,Gizi Lebih,Gizi Lebih
+Badan Lebih,Pendek,Gizi Lebih,Gizi Lebih
+Sangat Kurang,Normal,Gizi Lebih,Gizi Lebih
+Kurang,Normal,Gizi Lebih,Gizi Lebih
+Badan Lebih,Normal,Gizi Lebih,Gizi Lebih
+Sangat Kurang,Tinggi,Gizi Lebih,Gizi Lebih
+Kurang,Tinggi,Gizi Lebih,Gizi Lebih
+Badan Lebih,Tinggi,Gizi Lebih,Gizi Lebih
