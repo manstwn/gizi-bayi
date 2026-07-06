@@ -173,14 +173,13 @@ const LiveCalculation = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-4">
         <div>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center">
-            <div className="bg-medical-600 p-2 rounded-2xl mr-4 shadow-lg shadow-medical-100">
+            <div className="bg-medical-600 p-2 rounded-2xl mr-4 shadow-lg shadow-medical-100 flex-shrink-0">
               <Cpu className="text-white" size={32} />
             </div>
-            GiziEngine Pro <span className="ml-3 text-xs bg-slate-900 text-white px-3 py-1 rounded-full font-black uppercase tracking-widest">v2.1</span>
+            Simulasi Perhitungan Status Gizi
           </h1>
           <p className="text-slate-500 mt-3 font-semibold text-sm max-w-xl">
-            Sistem pakar status gizi berbasis WHO Anthropometric Standards dengan teknologi 
-            <span className="text-medical-600 ml-1">Dynamic Anchor Interpolation</span>.
+            Lakukan simulasi dan analisis status gizi balita secara interaktif dengan mengatur umur, jenis kelamin, berat badan, dan tinggi badan.
           </p>
         </div>
         {loading && <RefreshCw className="animate-spin text-medical-600" size={28} />}
@@ -326,7 +325,7 @@ const LiveCalculation = () => {
                 >
                   <CheckCircle2 size={18} className={isFollowMode ? 'animate-pulse' : ''} />
                   <span className="text-[10px] font-black uppercase tracking-widest">
-                    {isFollowMode ? 'Auto-Follow Ideal Active' : 'Enable Auto-Follow Ideal'}
+                    {isFollowMode ? 'Berat & Tinggi Ideal Aktif' : 'Gunakan Berat & Tinggi Ideal'}
                   </span>
                 </button>
               </div>
@@ -488,27 +487,6 @@ const LiveCalculation = () => {
                 </table>
               </div>
 
-              {/* Ringkasan Kesimpulan */}
-              <div className="bg-slate-900 rounded-3xl p-5 text-white grid grid-cols-3 gap-4 border border-white/5">
-                <div className="text-center">
-                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Status Gizi ({inputs.umur < 24 ? 'BB/PB - 0-23 Bulan' : 'BB/TB - 24-60 Bulan'})</p>
-                  <p className="text-xs font-black text-emerald-400 truncate">{result.indices.bbtb?.category || '--'}</p>
-                </div>
-                <div className="text-center border-x border-white/10">
-                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Stunting (TB/U)</p>
-                  <p className={cn(
-                    "text-xs font-black truncate",
-                    result.summary?.stunting === 'Normal' ? 'text-emerald-400' : 'text-rose-400'
-                  )}>{result.summary?.stunting || '--'}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Underweight (BB/U)</p>
-                  <p className={cn(
-                    "text-xs font-black truncate",
-                    result.summary?.underweight === 'Normal' ? 'text-emerald-400' : 'text-rose-400'
-                  )}>{result.summary?.underweight || '--'}</p>
-                </div>
-              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-64 bg-white rounded-[2rem] border border-dashed border-slate-200">
@@ -580,63 +558,7 @@ const LiveCalculation = () => {
         </div>
       </div>
 
-      {/* Anchor Data Repository WHO */}
-      {pairData && (
-        <div className="space-y-6 pt-8 border-t border-slate-100">
-          <div className="flex items-center space-x-4 px-4">
-            <div className="bg-slate-900 p-3 rounded-2xl shadow-lg">
-              <Activity className="text-emerald-400" size={24} />
-            </div>
-            <div>
-              <h3 className="text-slate-900 font-black text-xl">Repository Data Referensi WHO</h3>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">
-                Menggunakan Data Kurva: {inputs.gender === 'L' ? 'Laki-Laki (Boy)' : 'Perempuan (Girl)'} (Otomatis Mengikuti Form)
-              </p>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-            {[
-              { id: 'umurToBerat', title: 'Berat Badan / Umur (Age)', xLabel: 'Bulan' },
-              { id: 'umurToTinggi', title: 'Tinggi Badan / Umur (Age)', xLabel: 'Bulan' },
-              { id: 'panjangToBerat', title: 'Berat Badan / Panjang (0-23 Bulan)', xLabel: 'Cm' },
-              { id: 'tinggiToBerat', title: 'Berat Badan / Tinggi (24-60 Bulan)', xLabel: 'Cm' }
-            ].map((table) => (
-              <div key={table.id} className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden flex flex-col h-[400px]">
-                <div className="bg-slate-900 px-6 py-4 border-b border-slate-800">
-                  <h4 className="text-white font-black text-xs uppercase tracking-[0.2em]">{table.title}</h4>
-                </div>
-                <div className="overflow-y-auto flex-grow custom-scrollbar">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="sticky top-0 bg-slate-50 z-10 shadow-sm">
-                      <tr className="border-b border-slate-200">
-                        <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-tighter">{table.xLabel}</th>
-                        <th className="px-2 py-3 text-[10px] font-black text-rose-500 uppercase tracking-tighter">-3 SD</th>
-                        <th className="px-2 py-3 text-[10px] font-black text-rose-400 uppercase tracking-tighter">-2 SD</th>
-                        <th className="px-2 py-3 text-[10px] font-black text-emerald-600 uppercase tracking-tighter">Median</th>
-                        <th className="px-2 py-3 text-[10px] font-black text-blue-500 uppercase tracking-tighter">+2 SD</th>
-                        <th className="px-2 py-3 text-[10px] font-black text-blue-600 uppercase tracking-tighter">+3 SD</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {pairData?.[inputs.gender]?.[table.id]?.map((row, i) => (
-                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-4 py-3 text-sm font-black text-slate-900">{Object.values(row)[0]}</td>
-                          <td className="px-2 py-3 text-xs font-medium text-rose-400">{row.Minus_3SD != null && typeof row.Minus_3SD === 'number' ? row.Minus_3SD.toFixed(1) : '--'}</td>
-                          <td className="px-2 py-3 text-xs font-bold text-rose-500">{row.Minus_2SD != null && typeof row.Minus_2SD === 'number' ? row.Minus_2SD.toFixed(1) : '--'}</td>
-                          <td className="px-2 py-3 text-xs font-black text-emerald-600">{row.Median != null && typeof row.Median === 'number' ? row.Median.toFixed(1) : '--'}</td>
-                          <td className="px-2 py-3 text-xs font-bold text-blue-500">{row.Plus_2SD != null && typeof row.Plus_2SD === 'number' ? row.Plus_2SD.toFixed(1) : '--'}</td>
-                          <td className="px-2 py-3 text-xs font-medium text-blue-600">{row.Plus_3SD != null && typeof row.Plus_3SD === 'number' ? row.Plus_3SD.toFixed(1) : '--'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

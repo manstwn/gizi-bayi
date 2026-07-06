@@ -12,6 +12,33 @@ exports.createPemeriksaan = async (req, res) => {
     const balita = await Balita.findByPk(balita_id);
     if (!balita) return res.status(404).json({ message: 'Balita not found' });
 
+    // Fetch global setting
+    const Setting = require('../models/Setting');
+    const setting = await Setting.findOne({ where: { key: 'app_settings' } });
+    
+    let resolvedMetode = metode;
+    let resolvedModelId = model_id;
+    
+    // Non-admins (kader) must use the globally configured setting
+    if (req.user?.role !== 'admin') {
+      if (setting && setting.value) {
+        const mode = setting.value.calculation_mode || 'WHO';
+        if (mode === 'WHO') {
+          resolvedMetode = 'WHO';
+          resolvedModelId = null;
+        } else if (mode === 'NB_LATEST') {
+          resolvedMetode = 'Naive Bayes';
+          resolvedModelId = null;
+        } else if (mode === 'NB_SPECIFIC') {
+          resolvedMetode = 'Naive Bayes';
+          resolvedModelId = setting.value.selected_model_id || null;
+        }
+      } else {
+        resolvedMetode = 'WHO';
+        resolvedModelId = null;
+      }
+    }
+
     // 1. Always calculate Z-Score Assessment using WHO Z-Score logic
     const assessment = NutritionalStatusService.assess(
       parseFloat(berat_badan), 
@@ -26,10 +53,10 @@ exports.createPemeriksaan = async (req, res) => {
     let prediction = null;
 
     // 2. If Naive Bayes classification is selected
-    if (metode === 'Naive Bayes') {
+    if (resolvedMetode === 'Naive Bayes') {
       let savedModel;
-      if (model_id) {
-        savedModel = await NaiveBayesModel.findByPk(model_id);
+      if (resolvedModelId) {
+        savedModel = await NaiveBayesModel.findByPk(resolvedModelId);
       } else {
         // Fallback to latest trained model
         savedModel = await NaiveBayesModel.findOne({ order: [['created_at', 'DESC']] });
@@ -82,7 +109,7 @@ exports.createPemeriksaan = async (req, res) => {
       kategori_gizi: finalKategori,
       petugas_id: req.user.id,
       catatan,
-      metode,
+      metode: resolvedMetode,
       model_id: finalModelId
     });
 
@@ -112,7 +139,7 @@ exports.getHistoryByBalita = async (req, res) => {
 exports.getAllPemeriksaan = async (req, res) => {
   try {
     const pemeriksaan = await Pemeriksaan.findAll({
-      include: [{ model: Balita, as: 'balita', attributes: ['nama'] }],
+      include: [{ model: Balita, as: 'balita', attributes: ['nama', 'jenis_kelamin'] }],
       order: [['tanggal_pemeriksaan', 'DESC']]
     });
     res.json(pemeriksaan);

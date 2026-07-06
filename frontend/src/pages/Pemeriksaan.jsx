@@ -12,6 +12,7 @@ import {
   Info
 } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { useAuth } from '../context/AuthContext';
 
 const Pemeriksaan = () => {
   const [balita, setBalita] = useState([]);
@@ -27,17 +28,40 @@ const Pemeriksaan = () => {
     catatan: ''
   });
   
+  const { user } = useAuth();
   const [result, setResult] = useState(null);
   const [metode, setMetode] = useState('WHO');
   const [selectedModelId, setSelectedModelId] = useState('');
   const [models, setModels] = useState([]);
 
   useEffect(() => {
+    const fetchGlobalSettings = async () => {
+      try {
+        const res = await api.get('/settings/fuzzy');
+        if (res.data && user?.role !== 'admin') {
+          const mode = res.data.calculation_mode || 'WHO';
+          if (mode === 'WHO') {
+            setMetode('WHO');
+          } else {
+            setMetode('Naive Bayes');
+            if (mode === 'NB_SPECIFIC' && res.data.selected_model_id) {
+              setSelectedModelId(res.data.selected_model_id);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching global settings in Pemeriksaan:', error);
+      }
+    };
+    fetchGlobalSettings();
+  }, [user]);
+
+  useEffect(() => {
     const fetchModels = async () => {
       try {
         const response = await api.get('/naive-bayes/models');
         setModels(response.data);
-        if (response.data.length > 0) {
+        if (response.data.length > 0 && !selectedModelId) {
           setSelectedModelId(response.data[0].id);
         }
       } catch (error) {
@@ -45,7 +69,7 @@ const Pemeriksaan = () => {
       }
     };
     fetchModels();
-  }, []);
+  }, [selectedModelId]);
 
   useEffect(() => {
     if (search.length >= 2) {
@@ -227,76 +251,77 @@ const Pemeriksaan = () => {
                       className="input-field h-12 text-lg font-black"
                     />
                   </div>
-                </div>
-                {/* Pilihan Metode Klasifikasi */}
-                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-4">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                    Metode Klasifikasi Status Gizi
-                  </label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      type="button"
-                      onClick={() => setMetode('WHO')}
-                      className={cn(
-                        "p-4 rounded-xl border-2 text-sm font-bold text-center transition-all flex flex-col items-center justify-center gap-2",
-                        metode === 'WHO'
-                          ? "bg-white border-medical-500 text-medical-600 shadow-md shadow-medical-100"
-                          : "bg-white/50 border-slate-200 text-slate-500 hover:border-slate-300"
-                      )}
-                    >
-                      <span className="text-lg">📊</span>
-                      <span>Standar WHO (Antropometri)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMetode('Naive Bayes')}
-                      className={cn(
-                        "p-4 rounded-xl border-2 text-sm font-bold text-center transition-all flex flex-col items-center justify-center gap-2",
-                        metode === 'Naive Bayes'
-                          ? "bg-white border-medical-500 text-medical-600 shadow-md shadow-medical-100"
-                          : "bg-white/50 border-slate-200 text-slate-500 hover:border-slate-300"
-                      )}
-                    >
-                      <span className="text-lg">🧠</span>
-                      <span>Categorical Naive Bayes</span>
-                    </button>
-                  </div>
-
-                  {metode === 'Naive Bayes' && (
-                    <div className="pt-2 animate-in fade-in slide-in-from-top-1 duration-300">
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
-                        Pilih Model Naive Bayes
-                      </label>
-                      {models.length > 0 ? (
-                        <select
-                          value={selectedModelId}
-                          onChange={(e) => setSelectedModelId(e.target.value)}
-                          className="input-field h-12 text-sm font-bold bg-white"
-                        >
-                          {models.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.nama_model} (Akurasi: {m.akurasi}%, Data: {m.jumlah_data})
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <div className="bg-rose-50 border border-rose-100 text-rose-700 p-4 rounded-xl text-xs flex items-start gap-2.5">
-                          <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-                          <div>
-                            <p className="font-bold">Model belum tersedia!</p>
-                            <p className="mt-1 text-[11px] font-medium leading-relaxed">
-                              Silakan latih model terlebih dahulu di menu{' '}
-                              <a href="/naive-bayes/train" className="underline font-bold hover:text-rose-900">
-                                Train Naive Bayes
-                              </a>{' '}
-                              sebelum menggunakan metode ini.
-                            </p>
-                          </div>
-                        </div>
-                      )}
+                </div>                {/* Pilihan Metode Klasifikasi */}
+                {user?.role === 'admin' && (
+                  <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-4">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                      Metode Klasifikasi Status Gizi
+                    </label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setMetode('WHO')}
+                        className={cn(
+                          "p-4 rounded-xl border-2 text-sm font-bold text-center transition-all flex flex-col items-center justify-center gap-2",
+                          metode === 'WHO'
+                            ? "bg-white border-medical-500 text-medical-600 shadow-md shadow-medical-100"
+                            : "bg-white/50 border-slate-200 text-slate-500 hover:border-slate-300"
+                        )}
+                      >
+                        <span className="text-lg">📊</span>
+                        <span>Standar WHO (Antropometri)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMetode('Naive Bayes')}
+                        className={cn(
+                          "p-4 rounded-xl border-2 text-sm font-bold text-center transition-all flex flex-col items-center justify-center gap-2",
+                          metode === 'Naive Bayes'
+                            ? "bg-white border-medical-500 text-medical-600 shadow-md shadow-medical-100"
+                            : "bg-white/50 border-slate-200 text-slate-500 hover:border-slate-300"
+                        )}
+                      >
+                        <span className="text-lg">🧠</span>
+                        <span>Categorical Naive Bayes</span>
+                      </button>
                     </div>
-                  )}
-                </div>
+
+                    {metode === 'Naive Bayes' && (
+                      <div className="pt-2 animate-in fade-in slide-in-from-top-1 duration-300">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+                          Pilih Model Naive Bayes
+                        </label>
+                        {models.length > 0 ? (
+                          <select
+                            value={selectedModelId}
+                            onChange={(e) => setSelectedModelId(e.target.value)}
+                            className="input-field h-12 text-sm font-bold bg-white"
+                          >
+                            {models.map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.nama_model} (Akurasi: {m.akurasi}%, Data: {m.jumlah_data})
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="bg-rose-50 border border-rose-100 text-rose-700 p-4 rounded-xl text-xs flex items-start gap-2.5">
+                            <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+                            <div>
+                              <p className="font-bold">Model belum tersedia!</p>
+                              <p className="mt-1 text-[11px] font-medium leading-relaxed">
+                                Silakan latih model terlebih dahulu di menu{' '}
+                                <a href="/naive-bayes/train" className="underline font-bold hover:text-rose-900">
+                                  Train Naive Bayes
+                                </a>{' '}
+                                sebelum menggunakan metode ini.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Observasi Tambahan (Opsional)</label>

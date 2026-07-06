@@ -125,7 +125,8 @@ const Laporan = () => {
       const response = await api.post('/settings/simulate', {
         bb: item.berat_badan,
         tb: item.tinggi_badan,
-        umur: item.umur_bulan
+        umur: item.umur_bulan,
+        gender: item.balita?.jenis_kelamin || 'L'
       });
       setExpandedDetails(response.data);
     } catch (error) {
@@ -420,26 +421,6 @@ const Laporan = () => {
                                     </table>
                                   </div>
                                   
-                                  <div className="bg-slate-900 rounded-2xl p-4 text-white grid grid-cols-3 gap-2 text-center text-[10px]">
-                                    <div>
-                                      <p className="text-[7px] text-slate-400 uppercase font-bold mb-0.5">Status Gizi ({item.umur_bulan < 24 ? 'BB/PB - 0-23 Bulan' : 'BB/TB - 24-60 Bulan'})</p>
-                                      <p className="font-black text-emerald-400 truncate">{expandedDetails.indices.bbtb?.category || '--'}</p>
-                                    </div>
-                                    <div className="border-x border-white/10">
-                                      <p className="text-[7px] text-slate-400 uppercase font-bold mb-0.5">Stunting (TB/U)</p>
-                                      <p className={cn(
-                                        "font-black truncate",
-                                        expandedDetails.summary?.stunting === 'Normal' ? 'text-emerald-400' : 'text-rose-400'
-                                      )}>{expandedDetails.summary?.stunting || '--'}</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-[7px] text-slate-400 uppercase font-bold mb-0.5">Underweight (BB/U)</p>
-                                      <p className={cn(
-                                        "font-black truncate",
-                                        expandedDetails.summary?.underweight === 'Normal' ? 'text-emerald-400' : 'text-rose-400'
-                                      )}>{expandedDetails.summary?.underweight || '--'}</p>
-                                    </div>
-                                  </div>
                                 </div>
 
                                 {/* Data Referensi Interpolasi (SD) */}

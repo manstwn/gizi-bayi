@@ -109,7 +109,9 @@ const MainLayout = ({ children }) => {
                 <div className="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
                   <User size={14} className="text-slate-400" />
                   <span className="text-xs font-black text-slate-700">{user?.nama}</span>
-                  <span className="text-[9px] bg-slate-200 text-slate-500 font-extrabold px-1.5 py-0.5 rounded uppercase">Kader</span>
+                  <span className="text-[9px] bg-slate-200 text-slate-500 font-extrabold px-1.5 py-0.5 rounded uppercase">
+                    {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : ''}
+                  </span>
                 </div>
                 <button
                   onClick={handleLogout}
@@ -159,7 +161,9 @@ const MainLayout = ({ children }) => {
                   <User size={16} className="text-slate-400" />
                   <span className="text-xs font-black text-slate-700 truncate">{user?.nama}</span>
                 </div>
-                <span className="text-[8px] bg-slate-200 text-slate-500 font-extrabold px-1.5 py-0.5 rounded uppercase">Kader</span>
+                <span className="text-[8px] bg-slate-200 text-slate-500 font-extrabold px-1.5 py-0.5 rounded uppercase">
+                  {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : ''}
+                </span>
               </div>
               <button
                 onClick={handleLogout}

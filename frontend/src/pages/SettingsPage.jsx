@@ -37,6 +37,15 @@ const SettingsPage = () => {
   const [rulesPage, setRulesPage] = useState(1);
   const rulesPerPage = 10;
 
+  const [appSettings, setAppSettings] = useState({
+    calculation_mode: 'WHO',
+    selected_model_id: ''
+  });
+  const [models, setModels] = useState([]);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsSuccessMsg, setSettingsSuccessMsg] = useState('');
+  const [settingsErrorMsg, setSettingsErrorMsg] = useState('');
+
   useEffect(() => {
     fetchSettingsData();
   }, []);
@@ -44,16 +53,35 @@ const SettingsPage = () => {
   const fetchSettingsData = async () => {
     try {
       setLoading(true);
-      const [pairRes, rulesRes] = await Promise.all([
+      const [pairRes, rulesRes, settingsRes, modelsRes] = await Promise.all([
         api.get('/settings/pairs'),
-        api.get('/settings/rules')
+        api.get('/settings/rules'),
+        api.get('/settings/fuzzy'),
+        api.get('/naive-bayes/models')
       ]);
       setPairData(pairRes.data);
       setRules(rulesRes.data || []);
+      setAppSettings(settingsRes.data || { calculation_mode: 'WHO', selected_model_id: '' });
+      setModels(modelsRes.data || []);
     } catch (error) {
       console.error('Error fetching settings data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveAppSettings = async () => {
+    try {
+      setSavingSettings(true);
+      setSettingsSuccessMsg('');
+      setSettingsErrorMsg('');
+      const res = await api.post('/settings/fuzzy', appSettings);
+      setSettingsSuccessMsg(res.data.message || 'Pengaturan kalkulasi berhasil disimpan.');
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      setSettingsErrorMsg('Gagal menyimpan pengaturan.');
+    } finally {
+      setSavingSettings(false);
     }
   };
 
@@ -111,6 +139,85 @@ const SettingsPage = () => {
           <RefreshCw size={20} />
           <span>Refresh Data CSV</span>
         </button>
+      </div>
+
+      {/* Global Calculation Settings Card */}
+      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden p-8 space-y-6">
+        <div className="flex items-center space-x-4 border-b border-slate-100 pb-5">
+          <div className="bg-medical-500 p-3 rounded-2xl shadow-lg shadow-medical-500/20 text-white flex-shrink-0">
+            <Settings size={24} />
+          </div>
+          <div>
+            <h3 className="text-slate-900 font-black text-xl">Metode Klasifikasi Gizi Default (Global)</h3>
+            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">
+              Tentukan metode klasifikasi gizi yang akan dikunci untuk pengguna Kader
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+              Metode Klasifikasi
+            </label>
+            <select
+              value={appSettings.calculation_mode || 'WHO'}
+              onChange={(e) => setAppSettings({ ...appSettings, calculation_mode: e.target.value })}
+              className="input-field h-12 text-xs font-bold bg-white"
+            >
+              <option value="WHO">Gunakan standar WHO Z-score</option>
+              <option value="NB_LATEST">Gunakan Categorical Naive Bayes - Model Terbaru</option>
+              <option value="NB_SPECIFIC">Gunakan Categorical Naive Bayes - Pilih Model</option>
+            </select>
+          </div>
+
+          {appSettings.calculation_mode === 'NB_SPECIFIC' && (
+            <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                Pilih Model Naive Bayes Spesifik
+              </label>
+              {models.length > 0 ? (
+                <select
+                  value={appSettings.selected_model_id || ''}
+                  onChange={(e) => setAppSettings({ ...appSettings, selected_model_id: e.target.value })}
+                  className="input-field h-12 text-xs font-bold bg-white"
+                >
+                  <option value="">-- Pilih Model --</option>
+                  {models.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.nama_model} (Akurasi: {m.akurasi}%, Data: {m.jumlah_data})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="text-xs text-rose-500 font-bold p-3 bg-rose-50 border border-rose-100 rounded-xl">
+                  Belum ada model Naive Bayes yang dilatih. Silakan train model terlebih dahulu.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center flex-wrap gap-4 pt-2">
+          <button
+            onClick={handleSaveAppSettings}
+            disabled={savingSettings || (appSettings.calculation_mode === 'NB_SPECIFIC' && !appSettings.selected_model_id)}
+            className="bg-medical-500 hover:bg-medical-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white px-6 py-3 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-medical-500/10"
+          >
+            {savingSettings ? 'Menyimpan...' : 'Simpan Pengaturan'}
+          </button>
+
+          {settingsSuccessMsg && (
+            <span className="text-xs text-emerald-600 font-bold bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-xl animate-in fade-in duration-300">
+              ✓ {settingsSuccessMsg}
+            </span>
+          )}
+          {settingsErrorMsg && (
+            <span className="text-xs text-rose-600 font-bold bg-rose-50 border border-rose-100 px-3 py-1.5 rounded-xl animate-in fade-in duration-300">
+              ⚠ {settingsErrorMsg}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
