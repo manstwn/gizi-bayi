@@ -117,7 +117,7 @@ const SettingsPage = () => {
             { label: 'Gizi Buruk', range: '< -3 SD', color: 'text-rose-600' },
             { label: 'Gizi Kurang', range: '-3 s/d -2 SD', color: 'text-rose-400' },
             { label: 'Gizi Baik', range: '-2 s/d +1 SD', color: 'text-emerald-600' },
-            { label: 'Obesitas', range: '> +3 SD', color: 'text-rose-700' }
+            { label: 'Gizi Lebih', range: '> +1 SD', color: 'text-blue-500' }
           ]}
         />
       </div>

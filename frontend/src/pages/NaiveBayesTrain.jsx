@@ -287,8 +287,7 @@ const getBBTBCategoryText = (z) => {
   if (z < -3) return 'Gizi buruk';
   if (z < -2) return 'Gizi kurang';
   if (z <= 1) return 'Gizi baik';
-  if (z <= 2) return 'Gizi lebih';
-  return 'Obesitas';
+  return 'Gizi lebih';
 };
 
 const formatZScoreCell = (z, category) => {
@@ -323,6 +322,8 @@ const NaiveBayesTrain = () => {
   const [modalOpen, setModalOpen]       = useState(false);
   const [modalTab, setModalTab]         = useState('main');
   const [searchQuery, setSearchQuery]   = useState('');
+  const [selectedModelId, setSelectedModelId] = useState(null);
+  const [selectedModelJson, setSelectedModelJson] = useState(null);
 
   const fetchAll = useCallback(async () => {
     setLoading((l) => ({ ...l, data: true, models: true }));
@@ -370,13 +371,29 @@ const NaiveBayesTrain = () => {
     if (!confirm('Hapus model ini?')) return;
     try {
       await api.delete(`/naive-bayes/models/${id}`);
+      if (selectedModelId === id) {
+        setSelectedModelId(null);
+        setSelectedModelJson(null);
+      }
       fetchAll();
     } catch {
       alert('Gagal menghapus model.');
     }
   };
 
-  const displayModel = trainResult || latestModel;
+  const handleSelectModel = async (modelId) => {
+    setSelectedModelId(modelId);
+    setTrainResult(null);
+    try {
+      const res = await api.get(`/naive-bayes/models/${modelId}`);
+      setSelectedModelJson(res.data.model_json);
+    } catch (e) {
+      console.error(e);
+      alert('Gagal memuat detail model.');
+    }
+  };
+
+  const displayModel = trainResult || selectedModelJson || latestModel;
 
   const mainCount  = trainingData?.total    ?? 0;
   const dummyCount = trainingData?.dummyTotal ?? 0;
@@ -533,20 +550,38 @@ const NaiveBayesTrain = () => {
               <p className="text-slate-400 text-xs font-medium text-center py-4">Belum ada model. Latih model terlebih dahulu.</p>
             ) : (
               <div className="space-y-3">
-                {models.map((m, i) => (
-                  <div key={m.id} className={`p-4 rounded-2xl border ${i === 0 ? 'border-violet-200 bg-violet-50' : 'border-slate-100 bg-slate-50'} flex items-start justify-between gap-2`}>
-                    <div className="min-w-0">
-                      <p className="font-bold text-sm text-slate-800 truncate">{m.nama_model}</p>
-                      <p className="text-[10px] text-slate-400 mt-1 font-medium">
-                        {m.jumlah_data} data · {m.jumlah_kelas} kelas · {m.akurasi != null ? `Akurasi ${m.akurasi}%` : 'N/A'}
-                      </p>
-                      <p className="text-[10px] text-slate-400">{new Date(m.created_at).toLocaleString('id-ID')}</p>
+                {models.map((m, i) => {
+                  const activeId = selectedModelId || models[0]?.id;
+                  const isSelected = m.id === activeId;
+                  return (
+                    <div
+                      key={m.id}
+                      onClick={() => handleSelectModel(m.id)}
+                      className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                        isSelected 
+                          ? 'border-violet-400 bg-violet-50/70 shadow-sm ring-2 ring-violet-500/5' 
+                          : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50/50 bg-slate-50'
+                      } flex items-start justify-between gap-2`}
+                    >
+                      <div className="min-w-0 flex-grow">
+                        <p className="font-bold text-sm text-slate-800 truncate">{m.nama_model}</p>
+                        <p className="text-[10px] text-slate-400 mt-1 font-medium">
+                          {m.jumlah_data} data · {m.jumlah_kelas} kelas · {m.akurasi != null ? `Akurasi ${m.akurasi}%` : 'N/A'}
+                        </p>
+                        <p className="text-[10px] text-slate-400">{new Date(m.created_at).toLocaleString('id-ID')}</p>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(m.id);
+                        }}
+                        className="text-rose-400 hover:text-rose-600 p-1.5 rounded-xl hover:bg-rose-50 transition-colors flex-shrink-0"
+                      >
+                        <Trash2 size={15} />
+                      </button>
                     </div>
-                    <button onClick={() => handleDelete(m.id)} className="text-rose-400 hover:text-rose-600 p-1.5 rounded-xl hover:bg-rose-50 transition-colors flex-shrink-0">
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </SectionCard>
@@ -772,12 +807,12 @@ const NaiveBayesTrain = () => {
                 </p>
               </Collapsible>
 
-              {/* Evaluation Metrics */}
+              {/* Evaluasi Model (Accuracy, Precision, Recall, F1-score) */}
               {displayModel.metrics && (
                 <SectionCard icon={Target} title="Evaluasi Model" subtitle="Dievaluasi pada test set yang terpisah (20% data)" color="rose">
                   <div className="space-y-6">
                     {/* Accuracy highlight */}
-                    <div className="grid grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {[
                         { label: 'Akurasi Test',  value: `${displayModel.accuracy}%`,                       color: 'emerald' },
                         { label: 'Macro Precision', value: `${(displayModel.metrics.macro?.precision * 100).toFixed(1)}%`, color: 'blue'    },
@@ -791,11 +826,6 @@ const NaiveBayesTrain = () => {
                       ))}
                     </div>
 
-                    {/* Confusion Matrix */}
-                    <Collapsible title="Confusion Matrix" defaultOpen={true}>
-                      <ConfusionMatrix matrix={displayModel.metrics.matrix} classes={displayModel.activeClasses} />
-                    </Collapsible>
-
                     {/* Per-class metrics */}
                     <Collapsible title="Precision · Recall · F1 per Kelas" defaultOpen={true}>
                       <MetricsTable
@@ -805,6 +835,13 @@ const NaiveBayesTrain = () => {
                       />
                     </Collapsible>
                   </div>
+                </SectionCard>
+              )}
+
+              {/* Tampilan Confusion matrix */}
+              {displayModel.metrics?.matrix && (
+                <SectionCard icon={Layers} title="Confusion Matrix" subtitle="Tabel pencocokan kelas aktual vs kelas prediksi" color="blue">
+                  <ConfusionMatrix matrix={displayModel.metrics.matrix} classes={displayModel.activeClasses} />
                 </SectionCard>
               )}
 
