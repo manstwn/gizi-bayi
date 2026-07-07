@@ -13,7 +13,6 @@ import SettingsPage from './pages/SettingsPage';
 import MainLayout from './components/MainLayout';
 import NaiveBayesTrain from './pages/NaiveBayesTrain';
 import NaiveBayesPredict from './pages/NaiveBayesPredict';
-import DummyDataPage from './pages/DummyDataPage';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -125,14 +124,7 @@ function App() {
           } 
         />
 
-        <Route 
-          path="/naive-bayes/dummy" 
-          element={
-            <ProtectedRoute>
-              <DummyDataPage />
-            </ProtectedRoute>
-          } 
-        />
+
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

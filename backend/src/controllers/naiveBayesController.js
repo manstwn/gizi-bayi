@@ -1,6 +1,5 @@
 const Pemeriksaan = require('../models/Pemeriksaan');
 const NaiveBayesModel = require('../models/NaiveBayesModel');
-const DummyData = require('../models/DummyData');
 const nbService = require('../services/naiveBayesService');
 const nutritionalStatusService = require('../services/nutritionalStatusService');
 
@@ -63,42 +62,28 @@ function enrichWithZScores(records) {
 
 exports.trainModel = async (req, res) => {
   try {
-    const { nama_model, data_source = 'main' } = req.body;
+    const { nama_model } = req.body;
     const { Op } = require('sequelize');
     const Balita = require('../models/Balita');
 
-    let mainRecords  = [];
-    let dummyRecords = [];
+    const rows = await Pemeriksaan.findAll({
+      attributes: ['umur_bulan', 'berat_badan', 'tinggi_badan', 'kategori_gizi'],
+      include: [{ model: Balita, as: 'balita', attributes: ['jenis_kelamin'] }],
+      where: { kategori_gizi: { [Op.not]: null } },
+    });
 
-    if (data_source === 'main' || data_source === 'both') {
-      const rows = await Pemeriksaan.findAll({
-        attributes: ['umur_bulan', 'berat_badan', 'tinggi_badan', 'kategori_gizi'],
-        include: [{ model: Balita, as: 'balita', attributes: ['jenis_kelamin'] }],
-        where: { kategori_gizi: { [Op.not]: null } },
-      });
-      mainRecords = rows.map((r) => ({
-        umur_bulan: r.umur_bulan,
-        berat_badan: r.berat_badan,
-        tinggi_badan: r.tinggi_badan,
-        kategori_gizi: r.kategori_gizi,
-        jenis_kelamin: r.balita?.jenis_kelamin || 'L',
-        _source: 'main'
-      }));
-    }
-
-    if (data_source === 'dummy' || data_source === 'both') {
-      const rows = await DummyData.findAll({
-        attributes: ['umur_bulan', 'berat_badan', 'tinggi_badan', 'kategori_gizi', 'jenis_kelamin'],
-        raw: true,
-      });
-      dummyRecords = rows.map((r) => ({ ...r, _source: 'dummy' }));
-    }
-
-    const allRecords = [...mainRecords, ...dummyRecords];
+    const allRecords = rows.map((r) => ({
+      umur_bulan: r.umur_bulan,
+      berat_badan: r.berat_badan,
+      tinggi_badan: r.tinggi_badan,
+      kategori_gizi: r.kategori_gizi,
+      jenis_kelamin: r.balita?.jenis_kelamin || 'L',
+      _source: 'main'
+    }));
 
     if (allRecords.length === 0) {
       return res.status(400).json({
-        message: `Tidak ada data dari sumber "${data_source}". Tambahkan data pemeriksaan atau dummy terlebih dahulu.`,
+        message: 'Tidak ada data pemeriksaan. Tambahkan data pemeriksaan terlebih dahulu.',
       });
     }
 
@@ -287,13 +272,6 @@ exports.getTrainingData = async (req, res) => {
       limit: 200,
     });
 
-    const dummyCount = await DummyData.count();
-    const dummyRows = await DummyData.findAll({
-      attributes: ['id', 'umur_bulan', 'berat_badan', 'tinggi_badan', 'kategori_gizi', 'jenis_kelamin', 'created_at'],
-      order: [['created_at', 'DESC']],
-      limit: 200,
-    });
-
     // Include Z-scores in preview
     const preview = records.map((r) => {
       let zscores = null;
@@ -329,40 +307,7 @@ exports.getTrainingData = async (req, res) => {
       };
     });
 
-    const dummyPreview = dummyRows.map((r) => {
-      let zscores = null;
-      let kategori_gizi = r.kategori_gizi;
-      try {
-        const assessment = nutritionalStatusService.assess(
-          r.berat_badan,
-          r.tinggi_badan,
-          r.umur_bulan,
-          r.jenis_kelamin || 'L'
-        );
-        zscores = {
-          z_bbu:  parseFloat(assessment.indices.bbu.z.toFixed(3)),
-          z_tbu:  parseFloat(assessment.indices.tbu.z.toFixed(3)),
-          z_bbtb: parseFloat(assessment.indices.bbtb.z.toFixed(3)),
-        };
-        kategori_gizi = assessment.summary.status; // Dinamis menggunakan keputusan new-data.csv
-      } catch {
-        zscores = null;
-      }
-
-      return {
-        id:             r.id,
-        nama:           `Dummy #${r.id}`,
-        umur_bulan:     r.umur_bulan,
-        berat_badan:    r.berat_badan,
-        tinggi_badan:   r.tinggi_badan,
-        kategori_gizi,
-        jenis_kelamin:  r.jenis_kelamin || 'L',
-        zscores,
-        status_data:    'Dummy',
-      };
-    });
-
-    res.json({ total: records.length, dummyTotal: dummyCount, records: preview, dummyRecords: dummyPreview });
+    res.json({ total: records.length, dummyTotal: 0, records: preview, dummyRecords: [] });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

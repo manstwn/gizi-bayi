@@ -5,7 +5,6 @@ const balitaRoutes = require('./routes/balitaRoutes');
 const pemeriksaanRoutes = require('./routes/pemeriksaanRoutes');
 const settingRoutes = require('./routes/settingRoutes');
 const naiveBayesRoutes = require('./routes/naiveBayesRoutes');
-const dummyDataRoutes = require('./routes/dummyDataRoutes');
 
 const app = express();
 
@@ -19,7 +18,6 @@ app.use('/api/balita', balitaRoutes);
 app.use('/api/pemeriksaan', pemeriksaanRoutes);
 app.use('/api/settings', settingRoutes);
 app.use('/api/naive-bayes', naiveBayesRoutes);
-app.use('/api/dummy-data', dummyDataRoutes);
 
 // Root route
 app.get('/', (req, res) => {
