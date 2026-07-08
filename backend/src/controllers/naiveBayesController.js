@@ -62,7 +62,7 @@ function enrichWithZScores(records) {
 
 exports.trainModel = async (req, res) => {
   try {
-    const { nama_model } = req.body;
+    const { nama_model, data_source = 'main' } = req.body;
     const { Op } = require('sequelize');
     const Balita = require('../models/Balita');
 
@@ -99,8 +99,8 @@ exports.trainModel = async (req, res) => {
     // Train
     const modelData = nbService.trainModel(enriched);
     modelData.data_source  = data_source;
-    modelData.mainCount    = mainRecords.length;
-    modelData.dummyCount   = dummyRecords.length;
+    modelData.mainCount    = enriched.length;
+    modelData.dummyCount   = 0;
 
     const sourceLabel = { main: 'Data Utama', dummy: 'Dummy', both: 'Gabungan' }[data_source] || data_source;
 
